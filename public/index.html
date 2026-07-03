@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pemesanan Buku - Sekolah Islam Mumtaz</title>
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Decorative background -->
+  <div class="page-bg"></div>
+  <div class="page-bg-circles"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="container">
+    <!-- Header Card -->
+    <header class="header-card">
+      <img src="/images/logo.png" alt="Logo Sekolah Islam Mumtaz" class="school-logo">
+      <h1 class="school-title">Sekolah Islam Mumtaz</h1>
+      <p class="school-subtitle">Pemesanan Buku Sekolah</p>
+    </header>
+
+    <!-- Parent Form Card -->
+    <main>
+      <form id="booking-form" onsubmit="handleFormSubmit(event)">
+        <div class="form-card">
+          <h2 class="section-title">
+            <i class="fa-solid fa-user-graduate"></i> Informasi Siswa & Orang Tua
+          </h2>
+
+          <!-- Nama Siswa -->
+          <div class="form-group">
+            <label for="student-name">Nama Lengkap Siswa</label>
+            <input type="text" id="student-name" class="form-control" placeholder="Contoh: Muhammad Rafif" required autocomplete="off">
+          </div>
+
+          <!-- Kelas Dropdown -->
+          <div class="form-group">
+            <label for="student-class">Kelas</label>
+            <select id="student-class" class="form-control" required onchange="handleClassChange(this.value)">
+              <option value="" disabled selected>Pilih Kelas...</option>
+              <option value="7">Kelas 7</option>
+              <option value="8">Kelas 8</option>
+              <option value="9">Kelas 9</option>
+              <option value="10">Kelas 10</option>
+              <option value="11">Kelas 11</option>
+              <option value="12">Kelas 12</option>
+            </select>
+          </div>
+
+          <!-- No Virtual Account -->
+          <div class="form-group">
+            <label for="va-number">Nomor Virtual Account (VA)</label>
+            <input type="text" id="va-number" class="form-control" placeholder="Contoh: 9888801234567890" required autocomplete="off" pattern="[0-9]+" title="Nomor Virtual Account hanya boleh berisi angka.">
+          </div>
+
+          <!-- Nama Orang Tua -->
+          <div class="form-group">
+            <label for="parent-name">Nama Lengkap Orang Tua</label>
+            <input type="text" id="parent-name" class="form-control" placeholder="Contoh: Ahmad Sulaiman" required autocomplete="off">
+          </div>
+
+          <!-- No Whatsapp Orang Tua -->
+          <div class="form-group">
+            <label for="parent-whatsapp">Nomor Whatsapp Orang Tua</label>
+            <input type="tel" id="parent-whatsapp" class="form-control" placeholder="Contoh: 081234567890" required autocomplete="off" pattern="^(08|628|\+628)[0-9]{8,13}$" title="Gunakan format nomor Indonesia yang valid, contoh: 081234567890">
+          </div>
+
+          <!-- Alamat Email Orang Tua -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="parent-email">Alamat Email Orang Tua</label>
+            <input type="email" id="parent-email" class="form-control" placeholder="Contoh: ahmad@email.com" required autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Dynamic Books Checklist Card -->
+        <div id="books-section" class="books-card">
+          <h2 class="section-title">
+            <i class="fa-solid fa-book-open"></i> Pilih Buku yang Dipesan
+          </h2>
+          <p class="school-subtitle" style="color: var(--text-muted); font-size: 0.8rem; margin-top: -12px; margin-bottom: 16px; text-transform: none; letter-spacing: 0;">
+            * Centang buku yang ingin Anda beli. Centang semua jika ingin membeli satu paket.
+          </p>
+
+          <div id="books-list" class="books-list">
+            <!-- Books will be loaded here dynamically -->
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <!-- Bottom Floating Summary Bar -->
+  <div id="bottom-bar" class="bottom-bar">
+    <div class="bottom-bar-content">
+      <div class="price-summary">
+        <span class="summary-label">Total Harga</span>
+        <span id="price-total" class="summary-total">Rp 0</span>
+      </div>
+      <button type="submit" form="booking-form" class="btn-order">
+        <i class="fa-solid fa-cart-shopping"></i> Pesan Buku
+      </button>
+    </div>
+  </div>
+
+  <!-- Success Confirmation Modal -->
+  <div id="success-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-icon">
+        <i class="fa-brands fa-whatsapp"></i>
+      </div>
+      <h3 class="modal-title">Pesanan Disimpan!</h3>
+      <p class="modal-desc">
+        Data pesanan Anda telah berhasil disimpan di database server. Silakan klik tombol di bawah untuk mengirimkan konfirmasi via WhatsApp.
+      </p>
+      <a href="#" id="whatsapp-btn" target="_blank" class="btn-whatsapp-redirect">
+        <i class="fa-brands fa-whatsapp"></i> Kirim WhatsApp
+      </a>
+    </div>
+  </div>
+
+  <!-- App Logic script -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
