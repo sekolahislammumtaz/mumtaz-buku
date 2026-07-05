@@ -258,27 +258,67 @@ app.post('/api/admin/books/import', authenticateAdmin, upload.single('file'), as
 
     let importedCount = 0;
     
-    // We will do a transaction or serialize inserts
-    for (const row of rows) {
-      // Columns: Nama Buku, Penerbit, Harga Buku (or they could be lowercased / alternate named)
-      const name = row['Nama Buku'] || row['name'] || row['Nama'] || row['Book Name'];
-      const publisher = row['Penerbit'] || row['publisher'] || row['Publisher'];
-      const priceRaw = row['Harga Buku'] || row['Harga'] || row['price'] || row['Price'] || row['Harga_Buku'];
-      
-      // Class can be specified in Excel row under 'Kelas' or 'kelas' or 'Class' column,
-      // fallback to the defaultKelas selected in UI.
-      const kelasRaw = row['Kelas'] || row['kelas'] || row['Class'] || defaultKelas;
+    const nameKeys = ['namabuku', 'namabukusekolah', 'nama', 'name', 'bookname', 'judul', 'judulbuku'];
+    const publisherKeys = ['penerbit', 'publisher'];
+    const priceKeys = ['hargabuku', 'harga', 'price', 'hargabukusekolah'];
+    const classKeys = ['kelas', 'class', 'tingkat', 'tingkatan'];
 
-      if (!name || !priceRaw) {
-        continue; // skip invalid rows
+    for (const row of rows) {
+      // Normalize row keys to lowercase alphanumeric only
+      const normalizedRow = {};
+      for (const key of Object.keys(row)) {
+        if (key !== undefined && key !== null) {
+          const normKey = key.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+          normalizedRow[normKey] = row[key];
+        }
       }
 
-      const price = parseInt(priceRaw.toString().replace(/[^0-9]/g, ''));
-      const kelas = kelasRaw ? kelasRaw.toString().trim() : '';
+      // Lookup values using normalized keys
+      let name = '';
+      for (const k of nameKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          name = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let publisher = '';
+      for (const k of publisherKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          publisher = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let priceRaw = null;
+      for (const k of priceKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          priceRaw = normalizedRow[k];
+          break;
+        }
+      }
+
+      let kelasRaw = null;
+      for (const k of classKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          kelasRaw = normalizedRow[k];
+          break;
+        }
+      }
+
+      // Validate required fields
+      if (!name || priceRaw === undefined || priceRaw === null) {
+        continue; // skip invalid or empty rows
+      }
+
+      // Parse price, removing non-numeric characters (e.g. "Rp 75.000" -> 75000)
+      const price = parseInt(priceRaw.toString().replace(/[^0-9]/g, '')) || 0;
+      
+      // Parse class, stripping non-numeric text (e.g. "Kelas 8" -> "8")
+      const kelas = (kelasRaw ? kelasRaw.toString().trim().replace(/[^0-9]/g, '') : '') || defaultKelas;
 
       if (!kelas) {
-        // If there is no class info, we skip or reject
-        continue;
+        continue; // skip if class could not be resolved
       }
 
       await dbQuery.run(
