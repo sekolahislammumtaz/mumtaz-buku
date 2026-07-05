@@ -522,18 +522,20 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+const isVercel = !!process.env.VERCEL;
+
 // Initialize DB and start server (or export for serverless environment)
 initDatabase().then(() => {
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isVercel) {
     app.listen(PORT, () => {
       console.log(`Server Sekolah Islam Mumtaz berjalan di http://localhost:${PORT}`);
     });
   } else {
-    console.log('Database initialized successfully in production mode.');
+    console.log('Database initialized successfully in Serverless mode (Vercel).');
   }
 }).catch(err => {
   console.error('Gagal menginisialisasi database:', err);
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isVercel) {
     process.exit(1);
   }
 });
