@@ -2,8 +2,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 // Check database mode from environment variables
-const isPostgres = !!process.env.DATABASE_URL && 
-  (process.env.DATABASE_URL.startsWith('postgres://') || process.env.DATABASE_URL.startsWith('postgresql://'));
+const dbUrl = process.env.DATABASE_URL ? process.env.DATABASE_URL.trim() : '';
+const isPostgres = !!dbUrl && 
+  (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
 const isLibsql = !isPostgres && !!process.env.TURSO_DATABASE_URL;
 
 let db = null;         // for SQLite3
@@ -26,7 +27,7 @@ if (isPostgres) {
   console.log('Database Mode: Cloud PostgreSQL (Neon)');
   const { Client } = require('pg');
   pgClient = new Client({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: dbUrl,
     ssl: {
       rejectUnauthorized: false
     }
