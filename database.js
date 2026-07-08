@@ -38,7 +38,8 @@ if (isPostgres) {
     async run(sql, params = []) {
       let querySql = convertPlaceholders(sql);
       const isInsert = querySql.trim().toUpperCase().startsWith('INSERT');
-      if (isInsert && !querySql.toUpperCase().includes('RETURNING')) {
+      const isSettings = querySql.toUpperCase().includes('INTO SETTINGS');
+      if (isInsert && !isSettings && !querySql.toUpperCase().includes('RETURNING')) {
         querySql += ' RETURNING id';
       }
       
