@@ -171,6 +171,17 @@ async function initDatabase() {
       )
     `);
 
+    await pgClient.query(`
+      CREATE TABLE IF NOT EXISTS students (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        kelas VARCHAR(50) NOT NULL,
+        va_number TEXT NOT NULL,
+        whatsapp TEXT NOT NULL,
+        email TEXT NOT NULL
+      )
+    `);
+
     // Seed default password if setting missing
     const row = await dbQuery.get('SELECT value FROM settings WHERE key = $1', ['admin_password']);
     if (!row) {
@@ -211,6 +222,17 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )
+    `);
+
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        kelas TEXT NOT NULL,
+        va_number TEXT NOT NULL,
+        whatsapp TEXT NOT NULL,
+        email TEXT NOT NULL
       )
     `);
 
@@ -255,6 +277,17 @@ async function initDatabase() {
           CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+          )
+        `, (err) => { if (err) return reject(err); });
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kelas TEXT NOT NULL,
+            va_number TEXT NOT NULL,
+            whatsapp TEXT NOT NULL,
+            email TEXT NOT NULL
           )
         `, (err) => {
           if (err) return reject(err);

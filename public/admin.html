@@ -70,6 +70,9 @@
         <button id="tab-books-btn" class="tab-btn" onclick="switchTab('books')">
           <i class="fa-solid fa-book"></i> Kelola Daftar Buku
         </button>
+        <button id="tab-students-btn" class="tab-btn" onclick="switchTab('students')">
+          <i class="fa-solid fa-users"></i> Kelola Data Siswa
+        </button>
       </div>
 
       <!-- ========================================== -->
@@ -296,6 +299,93 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: STUDENTS (KELOLA DATA SISWA) -->
+      <!-- ========================================== -->
+      <div id="tab-students" class="tab-content">
+        <!-- Import student data section -->
+        <div class="admin-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 style="color: var(--primary-navy); font-weight: 800; font-size: 1.4rem;">
+                Impor Data Siswa dari Excel
+              </h2>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+                Unggah file Excel daftar siswa dengan kolom: <b>Nama Siswa</b>, <b>Kelas</b>, <b>No VA</b>, <b>No Whatsapp</b>, <b>Alamat Email</b>.
+              </p>
+            </div>
+            <div>
+              <button onclick="clearAllStudents()" class="btn-danger">
+                <i class="fa-solid fa-trash-can"></i> Kosongkan Semua Data Siswa
+              </button>
+            </div>
+          </div>
+
+          <form id="import-students-form" onsubmit="handleImportStudents(event)" style="border: 2px dashed #E2E8F0; padding: 24px; border-radius: var(--border-radius-md); text-align: center; background-color: #F8FAFC;">
+            <div style="margin-bottom: 16px;">
+              <i class="fa-regular fa-file-excel" style="font-size: 3rem; color: #10B981; margin-bottom: 12px;"></i>
+              <p style="font-weight: 600; color: var(--primary-navy);">Pilih file Excel (.xlsx / .xls)</p>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Pastikan data kolom sudah sesuai format.</p>
+            </div>
+            <input type="file" id="import-students-file" accept=".xlsx, .xls" required style="display: inline-block; margin-bottom: 16px; font-size: 0.9rem;">
+            <div>
+              <button type="submit" class="btn-action-accent" style="padding: 10px 24px;">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Mulai Impor Data Siswa
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Student List Table Section -->
+        <div class="admin-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 style="color: var(--primary-navy); font-weight: 800; font-size: 1.4rem;">
+                Daftar Siswa Terdaftar
+              </h2>
+            </div>
+            
+            <!-- Filters -->
+            <div style="display: flex; gap: 12px; align-items: center;" class="form-grid-3">
+              <input type="text" id="search-student" class="form-control" placeholder="Cari siswa..." oninput="filterStudentsTable()" style="max-width: 250px;">
+              <select id="filter-student-class" class="form-control" onchange="filterStudentsTable()" style="max-width: 160px; min-width: 120px;">
+                <option value="all">Semua Kelas</option>
+                <option value="7">Kelas 7</option>
+                <option value="8">Kelas 8</option>
+                <option value="9">Kelas 9</option>
+                <option value="10">Kelas 10</option>
+                <option value="11">Kelas 11</option>
+                <option value="12">Kelas 12</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Students Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Siswa</th>
+                  <th>Kelas</th>
+                  <th>No Virtual Account (VA)</th>
+                  <th>WhatsApp</th>
+                  <th>Alamat Email</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="students-table-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Memuat data siswa...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
     </div>

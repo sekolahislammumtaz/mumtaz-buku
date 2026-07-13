@@ -12,6 +12,7 @@ const priceTotalEl = document.getElementById('price-total');
 const successModal = document.getElementById('success-modal');
 const whatsappBtn = document.getElementById('whatsapp-btn');
 const toastContainer = document.getElementById('toast-container');
+const suggestionsBox = document.getElementById('autocomplete-suggestions');
 
 // Toast Helper
 function showToast(message, type = 'success') {
@@ -46,6 +47,68 @@ function showToast(message, type = 'success') {
 function formatRupiah(number) {
   return 'Rp ' + number.toLocaleString('id-ID');
 }
+
+// Handle Student Name input for Autocomplete suggestions
+async function handleStudentNameInput(val) {
+  if (!val || val.trim().length < 2) {
+    suggestionsBox.innerHTML = '';
+    suggestionsBox.style.display = 'none';
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/students/search?name=${encodeURIComponent(val)}`);
+    if (!response.ok) throw new Error();
+    
+    const students = await response.json();
+    
+    if (students.length === 0) {
+      suggestionsBox.innerHTML = '<div style="padding: 12px 16px; color: var(--text-muted); font-size: 0.85rem; background: #FFF;">Siswa tidak ditemukan. Masukkan data secara manual.</div>';
+      suggestionsBox.style.display = 'block';
+      return;
+    }
+
+    suggestionsBox.innerHTML = '';
+    
+    students.forEach(student => {
+      const item = document.createElement('div');
+      item.className = 'autocomplete-item';
+      item.onclick = () => selectStudent(student);
+      
+      item.innerHTML = `
+        <span class="item-name">${student.name}</span>
+        <span class="item-class">Kelas ${student.kelas}</span>
+      `;
+      suggestionsBox.appendChild(item);
+    });
+    
+    suggestionsBox.style.display = 'block';
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Auto-fill form fields when a student is selected
+function selectStudent(student) {
+  document.getElementById('student-name').value = student.name;
+  studentClassSelect.value = 'Kelas ' + student.kelas;
+  document.getElementById('va-number').value = student.va_number;
+  document.getElementById('parent-whatsapp').value = student.whatsapp || '';
+  document.getElementById('parent-email').value = student.email || '';
+  
+  suggestionsBox.style.display = 'none';
+  
+  // Trigger class change to fetch the checklist of books automatically
+  handleClassChange(student.kelas);
+}
+
+// Hide autocomplete popup when clicking outside the input
+document.addEventListener('click', (e) => {
+  const studentNameInput = document.getElementById('student-name');
+  if (e.target !== studentNameInput && e.target !== suggestionsBox) {
+    suggestionsBox.style.display = 'none';
+  }
+});
 
 // Handle class dropdown change
 async function handleClassChange(classVal) {
@@ -169,9 +232,8 @@ async function handleFormSubmit(event) {
   event.preventDefault();
   
   const studentName = document.getElementById('student-name').value.trim();
-  const className = studentClassSelect.value;
+  const className = studentClassSelect.value.replace(/[^0-9]/g, '');
   const vaNumber = document.getElementById('va-number').value.trim();
-  const parentName = document.getElementById('parent-name').value.trim();
   const parentWhatsapp = document.getElementById('parent-whatsapp').value.trim();
   const parentEmail = document.getElementById('parent-email').value.trim();
   
@@ -184,7 +246,6 @@ async function handleFormSubmit(event) {
     student_name: studentName,
     class_name: className,
     va_number: vaNumber,
-    parent_name: parentName,
     parent_whatsapp: parentWhatsapp,
     parent_email: parentEmail,
     book_ids: Array.from(selectedBookIds),
@@ -192,7 +253,6 @@ async function handleFormSubmit(event) {
   };
 
   try {
-    // Show spinner in button or loading toast
     showToast('Menyimpan pesanan Anda...', 'success');
 
     const response = await fetch('/api/orders', {

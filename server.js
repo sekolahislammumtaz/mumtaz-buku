@@ -63,20 +63,39 @@ app.get('/api/books/class/:class_name', async (req, res) => {
   }
 });
 
+// GET search student by name (Autocomplete)
+app.get('/api/students/search', async (req, res) => {
+  const { name } = req.query;
+  if (!name || name.trim().length < 2) {
+    return res.json([]);
+  }
+
+  try {
+    const term = `%${name.toLowerCase()}%`;
+    const matchedStudents = await dbQuery.all(
+      'SELECT name, kelas, va_number, whatsapp, email FROM students WHERE LOWER(name) LIKE ? ORDER BY name ASC LIMIT 10',
+      [term]
+    );
+    res.json(matchedStudents);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal mencari data siswa.' });
+  }
+});
+
 // Submit a new book order
 app.post('/api/orders', async (req, res) => {
   const {
     student_name,
     class_name,
     va_number,
-    parent_name,
     parent_whatsapp,
     parent_email,
     book_ids, // array of IDs
     total_price
   } = req.body;
 
-  if (!student_name || !class_name || !va_number || !parent_name || !parent_whatsapp || !parent_email || !book_ids || book_ids.length === 0) {
+  if (!student_name || !class_name || !va_number || !parent_whatsapp || !parent_email || !book_ids || book_ids.length === 0) {
     return res.status(400).json({ message: 'Mohon lengkapi seluruh data dan pilih minimal satu buku.' });
   }
 
@@ -91,7 +110,7 @@ app.post('/api/orders', async (req, res) => {
     const result = await dbQuery.run(`
       INSERT INTO orders (student_name, class_name, va_number, parent_name, parent_whatsapp, parent_email, book_details, total_price, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [student_name, class_name, va_number, parent_name, parent_whatsapp, parent_email, bookDetailsJson, total_price, createdAt]);
+    `, [student_name, class_name, va_number, '', parent_whatsapp, parent_email, bookDetailsJson, total_price, createdAt]);
 
     res.status(201).json({
       message: 'Pesanan berhasil disimpan.',
@@ -335,6 +354,149 @@ app.post('/api/admin/books/import', authenticateAdmin, upload.single('file'), as
   }
 });
 
+// ----------------------------------------------------
+// ADMIN STUDENTS MANAGEMENT API
+// ----------------------------------------------------
+
+// GET all students (admin view)
+app.get('/api/admin/students', authenticateAdmin, async (req, res) => {
+  try {
+    const students = await dbQuery.all('SELECT * FROM students ORDER BY kelas ASC, name ASC');
+    res.json(students);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal mengambil data siswa.' });
+  }
+});
+
+// DELETE single student
+app.delete('/api/admin/students/:id', authenticateAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await dbQuery.run('DELETE FROM students WHERE id = ?', [id]);
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
+    }
+    res.json({ message: 'Siswa berhasil dihapus.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal menghapus data siswa.' });
+  }
+});
+
+// DELETE all students
+app.delete('/api/admin/students-clear/all', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery.run('DELETE FROM students');
+    res.json({ message: `Berhasil menghapus seluruh data siswa.` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal menghapus data siswa.' });
+  }
+});
+
+// POST import students from Excel/CSV
+app.post('/api/admin/students/import', authenticateAdmin, upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Harap unggah file Excel/CSV.' });
+  }
+
+  try {
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(worksheet);
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: 'File Excel kosong atau tidak terbaca.' });
+    }
+
+    let importedCount = 0;
+
+    const nameKeys = ['namasiswa', 'nama', 'name', 'studentname', 'fullname'];
+    const classKeys = ['kelas', 'class', 'tingkat'];
+    const vaKeys = ['novirtualaccount', 'virtualaccount', 'nova', 'vanumber', 'no_va', 'va'];
+    const whatsappKeys = ['nowhatsapp', 'whatsapp', 'nowa', 'wa', 'nomorwhatsapp', 'nomorwa', 'telepon', 'nohp', 'no_whatsapp'];
+    const emailKeys = ['alamatemail', 'email', 'alamatemailorangtua', 'emailorangtua', 'parentemail', 'no_email'];
+
+    for (const row of rows) {
+      // Normalize keys
+      const normalizedRow = {};
+      for (const key of Object.keys(row)) {
+        if (key !== undefined && key !== null) {
+          const normKey = key.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+          normalizedRow[normKey] = row[key];
+        }
+      }
+
+      // Lookup student properties
+      let name = '';
+      for (const k of nameKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          name = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let kelasRaw = '';
+      for (const k of classKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          kelasRaw = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let vaRaw = '';
+      for (const k of vaKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          vaRaw = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let whatsappRaw = '';
+      for (const k of whatsappKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          whatsappRaw = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      let emailRaw = '';
+      for (const k of emailKeys) {
+        if (normalizedRow[k] !== undefined && normalizedRow[k] !== null) {
+          emailRaw = normalizedRow[k].toString().trim();
+          break;
+        }
+      }
+
+      if (!name || !kelasRaw || !vaRaw) {
+        continue;
+      }
+
+      // Format class (strip non-numeric e.g. "Kelas 8" -> "8")
+      const kelas = kelasRaw.replace(/[^0-9]/g, '');
+      if (!kelas) continue;
+
+      // Clean WhatsApp (ensure digits only, prefix digits)
+      const whatsapp = whatsappRaw.replace(/[^0-9]/g, '');
+
+      await dbQuery.run(
+        'INSERT INTO students (name, kelas, va_number, whatsapp, email) VALUES (?, ?, ?, ?, ?)',
+        [name, kelas, vaRaw, whatsapp || '', emailRaw || '']
+      );
+      
+      importedCount++;
+    }
+
+    res.json({ message: `Berhasil mengimpor ${importedCount} data siswa.` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal memproses file impor data siswa.' });
+  }
+});
+
+
 // GET all orders (admin view)
 app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
   try {
@@ -369,7 +531,7 @@ app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     total_price
   } = req.body;
 
-  if (!student_name || !class_name || !va_number || !parent_name || !parent_whatsapp || !parent_email || !book_details) {
+  if (!student_name || !class_name || !va_number || !parent_whatsapp || !parent_email || !book_details) {
     return res.status(400).json({ message: 'Data pesanan tidak lengkap.' });
   }
 

@@ -183,6 +183,10 @@ function switchTab(tabName) {
     document.getElementById('tab-books-btn').classList.add('active');
     document.getElementById('tab-books').classList.add('active');
     loadBooks();
+  } else if (tabName === 'students') {
+    document.getElementById('tab-students-btn').classList.add('active');
+    document.getElementById('tab-students').classList.add('active');
+    loadStudents();
   }
 }
 
@@ -710,5 +714,137 @@ async function handleChangePassword(event) {
     }
   } catch (error) {
     showToast('Terjadi kesalahan koneksi server.', 'error');
+  }
+}
+
+// ----------------------------------------------------
+// STUDENTS MANAGEMENT
+// ----------------------------------------------------
+let allStudents = [];
+
+async function loadStudents() {
+  const tableBody = document.getElementById('students-table-body');
+  tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Memuat data siswa...</td></tr>';
+
+  try {
+    const response = await apiFetch('/api/admin/students');
+    if (!response.ok) throw new Error();
+    
+    allStudents = await response.json();
+    renderStudentsTable();
+  } catch (error) {
+    showToast('Gagal memuat data siswa.', 'error');
+  }
+}
+
+function renderStudentsTable(data = allStudents) {
+  const tableBody = document.getElementById('students-table-body');
+  if (data.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">Belum ada data siswa terdaftar. Silakan impor dari Excel.</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = '';
+  data.forEach((student, index) => {
+    const row = document.createElement('tr');
+    
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td style="font-weight: 700; color: var(--primary-navy);">${student.name}</td>
+      <td><span class="badge-class">Kelas ${student.kelas}</span></td>
+      <td style="font-family: monospace; font-size: 0.95rem; font-weight: 600;">${student.va_number}</td>
+      <td>${student.whatsapp || '<span style="color: var(--text-muted); font-style: italic;">Tidak ada</span>'}</td>
+      <td>${student.email || '<span style="color: var(--text-muted); font-style: italic;">Tidak ada</span>'}</td>
+      <td>
+        <div class="actions-flex">
+          <button onclick="deleteStudent(${student.id})" class="btn-sm-delete">
+            <i class="fa-solid fa-trash-can"></i> Hapus
+          </button>
+        </div>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+}
+
+function filterStudentsTable() {
+  const searchQuery = document.getElementById('search-student').value.toLowerCase().trim();
+  const classFilter = document.getElementById('filter-student-class').value;
+
+  const filtered = allStudents.filter(student => {
+    const matchesSearch = student.name.toLowerCase().includes(searchQuery) || student.va_number.includes(searchQuery);
+    const matchesClass = classFilter === 'all' || student.kelas.toString() === classFilter;
+    return matchesSearch && matchesClass;
+  });
+
+  renderStudentsTable(filtered);
+}
+
+async function deleteStudent(id) {
+  if (!confirm('Apakah Anda yakin ingin menghapus data siswa ini?')) return;
+
+  try {
+    const response = await apiFetch(`/api/admin/students/${id}`, {
+      method: 'DELETE'
+    });
+
+    const resData = await response.json();
+    if (response.ok) {
+      showToast(resData.message, 'success');
+      loadStudents();
+    } else {
+      showToast(resData.message || 'Gagal menghapus data siswa.', 'error');
+    }
+  } catch (error) {
+    showToast('Terjadi kesalahan koneksi server.', 'error');
+  }
+}
+
+async function clearAllStudents() {
+  if (!confirm('PENTING: Apakah Anda yakin ingin mengosongkan SELURUH data siswa? Tindakan ini tidak dapat dibatalkan.')) return;
+
+  try {
+    const response = await apiFetch('/api/admin/students-clear/all', {
+      method: 'DELETE'
+    });
+
+    const resData = await response.json();
+    if (response.ok) {
+      showToast(resData.message, 'success');
+      loadStudents();
+    } else {
+      showToast(resData.message || 'Gagal mengosongkan data siswa.', 'error');
+    }
+  } catch (error) {
+    showToast('Terjadi kesalahan koneksi server.', 'error');
+  }
+}
+
+async function handleImportStudents(event) {
+  event.preventDefault();
+  const fileInput = document.getElementById('import-students-file');
+  if (fileInput.files.length === 0) return;
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    showToast('Mengunggah & memproses file data siswa...', 'success');
+    
+    const response = await apiFetch('/api/admin/students/import', {
+      method: 'POST',
+      body: formData
+    });
+
+    const resData = await response.json();
+    if (response.ok) {
+      showToast(resData.message, 'success');
+      document.getElementById('import-students-form').reset();
+      loadStudents();
+    } else {
+      showToast(resData.message || 'Gagal mengimpor data siswa.', 'error');
+    }
+  } catch (error) {
+    showToast('Terjadi kesalahan koneksi server atau format file tidak sesuai.', 'error');
   }
 }
