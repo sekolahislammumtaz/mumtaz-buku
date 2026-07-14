@@ -1,10 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-
-const dbPath = path.join(__dirname, 'mumtaz_buku.db');
-console.log('Connecting to database at:', dbPath);
-
-const db = new sqlite3.Database(dbPath);
+const { initDatabase, dbQuery } = require('./database');
 
 const books = [
   // Kelas 7
@@ -50,28 +44,28 @@ const books = [
   { kelas: '12', name: 'Pendidikan Agama Islam Kelas 12', publisher: 'Tiga Serangkai', price: 70000 }
 ];
 
-db.serialize(() => {
-  // Clear existing books to avoid duplication
-  db.run('DELETE FROM books', (err) => {
-    if (err) {
-      console.error('Error clearing books:', err);
-      process.exit(1);
-    }
+async function runSeeder() {
+  try {
+    await initDatabase();
+    
+    console.log('Clearing existing books...');
+    await dbQuery.run('DELETE FROM books');
     console.log('Cleared existing books.');
-  });
 
-  const stmt = db.prepare('INSERT INTO books (kelas, name, publisher, price) VALUES (?, ?, ?, ?)');
-  
-  books.forEach(book => {
-    stmt.run(book.kelas, book.name, book.publisher, book.price);
-  });
-
-  stmt.finalize((err) => {
-    if (err) {
-      console.error('Error finalizing inserts:', err);
-      process.exit(1);
+    console.log('Seeding books...');
+    for (const book of books) {
+      await dbQuery.run(
+        'INSERT INTO books (kelas, name, publisher, price) VALUES (?, ?, ?, ?)',
+        [book.kelas, book.name, book.publisher, book.price]
+      );
     }
-    console.log('Seeded', books.length, 'books successfully.');
-    db.close();
-  });
-});
+    
+    console.log(`Seeded ${books.length} books successfully.`);
+    process.exit(0);
+  } catch (err) {
+    console.error('Error seeding database:', err);
+    process.exit(1);
+  }
+}
+
+runSeeder();

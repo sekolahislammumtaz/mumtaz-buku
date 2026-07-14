@@ -91,7 +91,7 @@ async function handleStudentNameInput(val) {
 // Auto-fill form fields when a student is selected
 function selectStudent(student) {
   document.getElementById('student-name').value = student.name;
-  studentClassSelect.value = 'Kelas ' + student.kelas;
+  studentClassSelect.value = student.kelas;
   document.getElementById('va-number').value = student.va_number;
   document.getElementById('parent-whatsapp').value = student.whatsapp || '';
   document.getElementById('parent-email').value = student.email || '';
@@ -288,6 +288,14 @@ async function handleFormSubmit(event) {
     
     // Display popup modal
     successModal.classList.add('show');
+    
+    // Attempt automatic WhatsApp redirect
+    const waWindow = window.open(waUrl, '_blank');
+    if (!waWindow || waWindow.closed || typeof waWindow.closed === 'undefined') {
+      showToast('Pesanan disimpan! Silakan klik tombol untuk membuka WhatsApp.', 'success');
+    } else {
+      showToast('Pesanan disimpan, membuka WhatsApp...', 'success');
+    }
     
     // Trigger auto click redirect or help user
     whatsappBtn.onclick = () => {

@@ -41,10 +41,18 @@
             <div id="autocomplete-suggestions" style="position: absolute; top: calc(100% - 2px); left: 0; width: 100%; background: #FFF; border: 2px solid #E2E8F0; border-top: none; border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm); z-index: 100; max-height: 200px; overflow-y: auto; box-shadow: 0 10px 20px rgba(15,35,63,0.1); display: none;"></div>
           </div>
 
-          <!-- Kelas (Read-only, auto-filled) -->
+          <!-- Kelas (Auto-filled or manual selection) -->
           <div class="form-group">
             <label for="student-class">Kelas</label>
-            <input type="text" id="student-class" class="form-control" placeholder="Pilih nama siswa untuk mengisi kelas..." readonly required>
+            <select id="student-class" class="form-control" required onchange="handleClassChange(this.value)">
+              <option value="" disabled selected>Pilih kelas...</option>
+              <option value="7">Kelas 7</option>
+              <option value="8">Kelas 8</option>
+              <option value="9">Kelas 9</option>
+              <option value="10">Kelas 10</option>
+              <option value="11">Kelas 11</option>
+              <option value="12">Kelas 12</option>
+            </select>
           </div>
 
           <!-- No Virtual Account -->
@@ -104,10 +112,10 @@
       </div>
       <h3 class="modal-title">Pesanan Disimpan!</h3>
       <p class="modal-desc">
-        Data pesanan Anda telah berhasil disimpan di database server. Silakan klik tombol di bawah untuk mengirimkan konfirmasi via WhatsApp.
+        Data pesanan Anda telah berhasil disimpan di database server. Sistem otomatis mengalihkan Anda ke WhatsApp. Jika tidak teralihkan, silakan klik tombol di bawah.
       </p>
       <a href="#" id="whatsapp-btn" target="_blank" class="btn-whatsapp-redirect">
-        <i class="fa-brands fa-whatsapp"></i> Kirim WhatsApp
+        <i class="fa-brands fa-whatsapp"></i> Hubungkan ke WhatsApp
       </a>
     </div>
   </div>
