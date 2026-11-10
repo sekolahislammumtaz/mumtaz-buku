@@ -775,7 +775,7 @@ async function clearBooksByClass() {
     return;
   }
   
-  if (!confirm(`PERINGATAN! Apakah Anda yakin ingin menghapus SEMUA daftar buku untuk Kelas ${classVal} di divisi ini?\nTindakan ini tidak dapat dibatalkan.`)) return;
+  if (!confirm(`Apakah Anda yakin ingin menghapus seluruh buku untuk Kelas ${classVal} pada unit ini?\nTindakan ini tidak dapat dibatalkan.`)) return;
   
   try {
     const response = await apiFetch(`/api/admin/books/class/${encodeURIComponent(classVal)}`, {
@@ -958,7 +958,7 @@ async function deleteStudent(id) {
 }
 
 async function clearAllStudents() {
-  if (!confirm('PENTING: Apakah Anda yakin ingin mengosongkan SELURUH data siswa di divisi ini? Tindakan ini tidak dapat dibatalkan.')) return;
+  if (!confirm('Apakah Anda yakin ingin mengosongkan seluruh data siswa pada unit ini?\nTindakan ini tidak dapat dibatalkan.')) return;
 
   try {
     const response = await apiFetch('/api/admin/students-clear/all', {

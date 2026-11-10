@@ -143,7 +143,7 @@ async function handleClassChange(classVal) {
       populateStudentDropdown(currentClassStudents);
     } else {
       studentNameSelect.innerHTML = '<option value="" disabled selected>Gagal memuat siswa</option>';
-      showToast('Gagal mengambil daftar siswa untuk kelas ini.', 'error');
+      showToast('Gagal memuat data siswa.', 'error');
     }
 
     // Handle data buku
@@ -152,7 +152,7 @@ async function handleClassChange(classVal) {
       renderBooksList();
     } else {
       booksListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #EF4444;"><i class="fa-solid fa-triangle-exclamation"></i> Gagal memuat daftar buku.</div>';
-      showToast('Gagal mengambil daftar buku.', 'error');
+      showToast('Gagal memuat data buku.', 'error');
     }
 
   } catch (error) {
@@ -220,18 +220,18 @@ function ensureDuplicateModal() {
   modal.innerHTML = `
     <div class="modal-content" style="max-width: 500px; text-align: left; padding: 28px;">
       <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
-        <div style="background: rgba(245, 158, 11, 0.15); color: #D97706; width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0;">
+        <div style="background: rgba(245, 158, 11, 0.15); color: #D97706; width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
           <i class="fa-solid fa-clock-rotate-left"></i>
         </div>
         <div>
-          <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary-navy); margin: 0;">Riwayat Pesanan Terdeteksi</h3>
+          <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--primary-navy); margin: 0;">Riwayat Pesanan Terdeteksi</h3>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;" id="duplicate-modal-student-name">Untuk siswa: -</p>
         </div>
       </div>
       
       <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: var(--border-radius-md); padding: 14px 16px; margin-bottom: 16px;">
         <p style="font-size: 0.9rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">
-          Ayah/Bunda sudah memesan buku:
+          Daftar buku yang telah dipesan sebelumnya:
         </p>
         <ul id="duplicate-books-list" class="duplicate-modal-list">
           <!-- Dynamic items -->
@@ -239,15 +239,15 @@ function ensureDuplicateModal() {
       </div>
 
       <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 20px;">
-        Ayah/Bunda hanya bisa memesan lagi buku yang belum dipesan. Jika Ayah/Bunda ingin membatalkan pesanan buku sebelumnya, silakan hubungi admin sekolah.
+        Buku di atas sudah tercatat dalam sistem dan tidak dapat dipilih kembali. Anda dapat melanjutkan pemesanan untuk buku lain yang belum dipesan, atau menghubungi admin jika ingin melakukan penyesuaian pesanan.
       </p>
 
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <button type="button" id="btn-confirm-duplicate" class="btn-order" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
-          <i class="fa-solid fa-check"></i> Saya Mengerti & Lanjutkan
+          <i class="fa-solid fa-check"></i> Lanjutkan Pemilihan Buku
         </button>
         <a href="#" id="duplicate-wa-admin-btn" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; background: #25D366; color: #FFF; font-weight: 600; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);">
-          <i class="fa-brands fa-whatsapp" style="font-size: 1.15rem;"></i> Hubungi Admin Sekolah via WhatsApp
+          <i class="fa-brands fa-whatsapp" style="font-size: 1.15rem;"></i> Hubungi Admin via WhatsApp
         </a>
       </div>
     </div>
@@ -290,8 +290,21 @@ function showDuplicateModal(studentName, orderedBooks) {
 
   if (waBtnEl) {
     const cleanWaTarget = (CONFIG.waTarget || '').replace(/[^0-9]/g, '');
-    const booksListText = orderedBooks.map(b => `- ${b.name}`).join('\n');
-    const waText = `Assalamu'alaikum Admin ${CONFIG.divisionName}. Saya orang tua dari ${studentName} (Kelas ${studentClassSelect ? studentClassSelect.value : ''}, No VA: ${vaNumberInput ? vaNumberInput.value : ''}). Siswa sudah memesan buku:\n${booksListText}\nSaya ingin berkonsultasi / membatalkan pesanan buku tersebut. Mohon bantuannya. Jazakumullahu Khairan.`;
+    const booksListText = orderedBooks.map(b => `• ${b.name}`).join('\n');
+    const waText = `Assalamu'alaikum Warahmatullahi Wabarakatuh,
+
+Yth. Admin ${CONFIG.divisionName},
+Saya orang tua/wali dari siswa:
+• Nama Siswa : ${studentName}
+• Kelas : Kelas ${studentClassSelect ? studentClassSelect.value : ''}
+• No. VA : ${vaNumberInput ? vaNumberInput.value : ''}
+
+Siswa telah tercatat memesan buku berikut:
+${booksListText}
+
+Saya ingin berkonsultasi mengenai perubahan / pembatalan pesanan buku tersebut. Mohon bantuannya.
+
+Jazakumullahu Khairan Wabarakallahu Fiikum.`;
     waBtnEl.href = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
   }
 
@@ -375,7 +388,17 @@ function renderBooksList() {
   // Jika semua buku untuk kelas ini sudah pernah dipesan oleh siswa ini
   if (allOrdered) {
     const cleanWaTarget = (CONFIG.waTarget || '').replace(/[^0-9]/g, '');
-    const waText = `Assalamu'alaikum Admin ${CONFIG.divisionName}. Saya orang tua dari ${studentName} (Kelas ${studentClassSelect.value}, No VA: ${vaNumberInput.value}). Semua buku untuk siswa ini sudah tercatat dipesan. Saya ingin konfirmasi / membatalkan pesanan. Mohon bantuannya. Jazakumullahu Khairan.`;
+    const waText = `Assalamu'alaikum Warahmatullahi Wabarakatuh,
+
+Yth. Admin ${CONFIG.divisionName},
+Saya orang tua/wali dari siswa:
+• Nama Siswa : ${studentName}
+• Kelas : Kelas ${studentClassSelect.value}
+• No. VA : ${vaNumberInput.value}
+
+Seluruh buku pada kelas ini telah tercatat dipesan sebelumnya. Saya ingin melakukan konfirmasi / pengecekan status pesanan. Mohon bantuannya.
+
+Jazakumullahu Khairan Wabarakallahu Fiikum.`;
     const waUrl = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
 
     const noticeCard = document.createElement('div');
@@ -384,12 +407,12 @@ function renderBooksList() {
       <div class="all-books-ordered-icon">
         <i class="fa-solid fa-circle-check"></i>
       </div>
-      <h3 class="all-books-ordered-title">Semua Buku Kelas ${studentClassSelect.value} Sudah Pernah Dipesan</h3>
+      <h3 class="all-books-ordered-title">Seluruh Buku Kelas ${studentClassSelect.value} Telah Dipesan</h3>
       <p class="all-books-ordered-desc">
-        Ayah/Bunda sudah memesan seluruh buku untuk <strong>${escapeHtml(studentName)}</strong>. Tidak ada buku lain yang perlu dipesan.
+        Seluruh paket buku untuk <strong>${escapeHtml(studentName)}</strong> telah tercatat dalam sistem. Tidak ada buku lain yang perlu dipesan.
       </p>
-      <p style="font-size: 0.82rem; color: #166534; margin-bottom: 16px;">
-        Jika Ayah/Bunda ingin membatalkan pesanan buku sebelumnya atau membutuhkan bantuan, silakan hubungi admin sekolah:
+      <p style="font-size: 0.85rem; color: #166534; margin-bottom: 16px;">
+        Apabila Anda membutuhkan bantuan atau ingin melakukan penyesuaian pesanan, silakan hubungi admin sekolah:
       </p>
       <a href="${waUrl}" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; background: #25D366; color: #FFF; font-weight: 700; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);">
         <i class="fa-brands fa-whatsapp" style="font-size: 1.2rem;"></i> Hubungi Admin via WhatsApp
@@ -510,12 +533,12 @@ async function handleFormSubmit(event) {
   const parentEmail = parentEmailInput.value.trim();
 
   if (!className) {
-    showToast('Harap pilih kelas terlebih dahulu.', 'error');
+    showToast('Pilih kelas terlebih dahulu.', 'error');
     return;
   }
 
   if (!studentName) {
-    showToast('Harap pilih nama siswa dari daftar.', 'error');
+    showToast('Pilih nama siswa.', 'error');
     return;
   }
 
@@ -525,7 +548,7 @@ async function handleFormSubmit(event) {
   }
 
   if (selectedBookIds.size === 0) {
-    showToast('Harap centang minimal satu buku yang ingin dipesan.', 'error');
+    showToast('Pilih minimal satu buku untuk dipesan.', 'error');
     return;
   }
 
@@ -536,7 +559,7 @@ async function handleFormSubmit(event) {
   });
 
   if (duplicateSelected.length > 0) {
-    showToast('Terdapat buku yang sudah pernah dipesan sebelumnya. Silakan pilih hanya buku yang belum dipesan.', 'error');
+    showToast('Beberapa buku telah dipesan sebelumnya. Pilih buku yang belum dipesan.', 'error');
     return;
   }
 
@@ -552,7 +575,7 @@ async function handleFormSubmit(event) {
   };
 
   try {
-    showToast('Menyimpan pesanan Anda...', 'success');
+    showToast('Menyimpan pesanan...', 'success');
 
     const response = await fetch('/api/orders', {
       method: 'POST',
@@ -569,10 +592,27 @@ async function handleFormSubmit(event) {
 
     // Detail buku terpilih untuk format pesan WA
     const selectedBooks = loadedBooks.filter(b => selectedBookIds.has(b.id));
-    const booksListText = selectedBooks.map(b => `- ${b.name} (${formatRupiah(b.price)})`).join('\n');
+    const booksListText = selectedBooks.map(b => `• ${b.name} (${formatRupiah(b.price)})`).join('\n');
 
-    // Format Pesan WhatsApp
-    const waText = `Assalamu'alaikum. Saya orang tua dari ${studentName} dari Kelas ${className} (${CONFIG.divisionName}) VA no ${vaNumber} dengan email ${parentEmail} mau pesan buku berikut :\n${booksListText}\nTotal: ${formatRupiah(totalPrice)}\nJazakumullahu Khairan`;
+    // Format Pesan WhatsApp Terstruktur & Formal Islami
+    const waText = `Assalamu'alaikum Warahmatullahi Wabarakatuh,
+
+Yth. Admin Pemesanan Buku ${CONFIG.divisionName},
+Berikut rincian pemesanan buku siswa:
+
+• Nama Siswa : ${studentName}
+• Kelas : Kelas ${className}
+• No. Virtual Account : ${vaNumber}
+• No. WhatsApp : ${parentWhatsapp || '-'}
+• Email : ${parentEmail || '-'}
+
+Daftar Buku yang Dipesan:
+${booksListText}
+
+Total Pembayaran: ${formatRupiah(totalPrice)}
+
+Mohon konfirmasi dan petunjuk selanjutnya.
+Jazakumullahu Khairan Wabarakallahu Fiikum.`;
 
     const cleanWaTarget = CONFIG.waTarget.replace(/[^0-9]/g, '');
     const waUrl = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
@@ -593,7 +633,7 @@ async function handleFormSubmit(event) {
     // Upayakan auto redirect ke WhatsApp
     const waWindow = window.open(waUrl, '_blank');
     if (!waWindow || waWindow.closed || typeof waWindow.closed === 'undefined') {
-      showToast('Pesanan tersimpan! Silakan klik tombol untuk membuka WhatsApp.', 'success');
+      showToast('Pesanan berhasil disimpan.', 'success');
     } else {
       showToast('Pesanan tersimpan, membuka WhatsApp...', 'success');
     }
