@@ -114,6 +114,95 @@ app.get('/api/students/search', async (req, res) => {
   }
 });
 
+// Check existing orders for a student (anti-duplicate check)
+app.get('/api/orders/check-student', async (req, res) => {
+  const division = req.query.division || 'mumtaz';
+  const student_name = req.query.student_name ? req.query.student_name.trim() : '';
+  const va_number = req.query.va_number ? req.query.va_number.trim() : '';
+
+  if (!student_name && !va_number) {
+    return res.json({
+      hasOrders: false,
+      has_orders: false,
+      ordersCount: 0,
+      orderedBooks: [],
+      ordered_books: [],
+      orderedBookNames: []
+    });
+  }
+
+  try {
+    let query = 'SELECT id, division, student_name, class_name, va_number, book_details, total_price, created_at FROM orders WHERE division = ?';
+    const params = [division];
+
+    if (student_name && va_number) {
+      query += ' AND (LOWER(TRIM(student_name)) = LOWER(TRIM(?)) OR va_number = ?)';
+      params.push(student_name, va_number);
+    } else if (student_name) {
+      query += ' AND LOWER(TRIM(student_name)) = LOWER(TRIM(?))';
+      params.push(student_name);
+    } else {
+      query += ' AND va_number = ?';
+      params.push(va_number);
+    }
+    query += ' ORDER BY id ASC';
+
+    const orders = await dbQuery.all(query, params);
+
+    // Fetch books in this division to assist with ID mapping
+    const dbBooks = await dbQuery.all('SELECT id, name, publisher, price FROM books WHERE division = ?', [division]);
+    const bookLookupByName = new Map();
+    dbBooks.forEach(b => {
+      if (b && b.name) {
+        bookLookupByName.set(b.name.trim().toLowerCase(), b);
+      }
+    });
+
+    const orderedBooksMap = new Map();
+    orders.forEach(order => {
+      let books = [];
+      try {
+        books = typeof order.book_details === 'string' ? JSON.parse(order.book_details) : (order.book_details || []);
+      } catch (e) {
+        books = [];
+      }
+
+      if (Array.isArray(books)) {
+        books.forEach(b => {
+          if (!b || !b.name) return;
+          const key = b.name.trim().toLowerCase();
+          if (!orderedBooksMap.has(key)) {
+            const dbBook = bookLookupByName.get(key);
+            orderedBooksMap.set(key, {
+              book_id: b.id || (dbBook ? dbBook.id : null),
+              name: b.name.trim(),
+              publisher: b.publisher || (dbBook ? dbBook.publisher : ''),
+              price: b.price || (dbBook ? dbBook.price : 0),
+              order_id: order.id,
+              order_date: order.created_at,
+              created_at: order.created_at
+            });
+          }
+        });
+      }
+    });
+
+    const orderedBooks = Array.from(orderedBooksMap.values());
+
+    res.json({
+      hasOrders: orderedBooks.length > 0,
+      has_orders: orderedBooks.length > 0,
+      ordersCount: orders.length,
+      orderedBooks: orderedBooks,
+      ordered_books: orderedBooks,
+      orderedBookNames: orderedBooks.map(b => b.name)
+    });
+  } catch (error) {
+    console.error('Error checking student orders:', error);
+    res.status(500).json({ message: 'Gagal memeriksa riwayat pesanan siswa.' });
+  }
+});
+
 // Submit a new book order
 app.post('/api/orders', async (req, res) => {
   const {
@@ -134,10 +223,42 @@ app.post('/api/orders', async (req, res) => {
   }
 
   try {
-    // Fetch details of chosen books to freeze them in the order
+    // 1. Fetch details of chosen books to freeze them in the order
     const placeholders = book_ids.map(() => '?').join(',');
-    const books = await dbQuery.all(`SELECT name, publisher, price FROM books WHERE id IN (${placeholders})`, book_ids);
-    
+    const books = await dbQuery.all(`SELECT id, name, publisher, price FROM books WHERE id IN (${placeholders})`, book_ids);
+
+    if (!books || books.length === 0) {
+      return res.status(400).json({ message: 'Buku yang dipilih tidak valid.' });
+    }
+
+    // 2. Anti-duplicate validation: check if student has already ordered any of these books in this division
+    const existingOrders = await dbQuery.all(`
+      SELECT id, book_details FROM orders 
+      WHERE division = ? AND (LOWER(TRIM(student_name)) = LOWER(TRIM(?)) OR va_number = ?)
+    `, [orderDivision, student_name, va_number]);
+
+    const previouslyOrderedNames = new Set();
+    existingOrders.forEach(ord => {
+      try {
+        const parsed = typeof ord.book_details === 'string' ? JSON.parse(ord.book_details) : (ord.book_details || []);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(b => {
+            if (b && b.name) {
+              previouslyOrderedNames.add(b.name.trim().toLowerCase());
+            }
+          });
+        }
+      } catch (e) {}
+    });
+
+    const duplicateBooks = books.filter(b => previouslyOrderedNames.has(b.name.trim().toLowerCase()));
+    if (duplicateBooks.length > 0) {
+      const duplicateNames = duplicateBooks.map(b => b.name).join(', ');
+      return res.status(400).json({
+        message: `Buku ${duplicateNames} sudah pernah dipesan sebelumnya untuk siswa ini.`
+      });
+    }
+
     const bookDetailsJson = JSON.stringify(books);
     const createdAt = new Date().toISOString();
 

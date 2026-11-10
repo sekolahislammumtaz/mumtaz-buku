@@ -1,5 +1,5 @@
 /**
- * order.js - Logic Pemesanan Buku Multi-Divisi
+ * order.js - Logic Pemesanan Buku Multi-Divisi dengan Pencegahan Pesanan Dobel
  * Digunakan oleh pesan-sd.html, pesan-smp-sma.html, dan pesan-mumtaz.html
  */
 
@@ -16,6 +16,7 @@ let loadedBooks = [];
 let selectedBookIds = new Set();
 let totalPrice = 0;
 let currentClassStudents = [];
+let currentStudentOrderedBooks = []; // Riwayat buku yang sudah dipesan siswa terpilih
 
 // DOM Elements
 const studentClassSelect = document.getElementById('student-class');
@@ -34,6 +35,7 @@ const toastContainer = document.getElementById('toast-container');
 // Inisialisasi saat DOM siap
 document.addEventListener('DOMContentLoaded', () => {
   initClassDropdown();
+  ensureDuplicateModal();
 });
 
 // Toast Helper
@@ -69,10 +71,36 @@ function formatRupiah(number) {
   return 'Rp ' + Number(number || 0).toLocaleString('id-ID');
 }
 
+// Escape HTML untuk mencegah XSS
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Format tanggal pesanan Indonesia
+function formatOrderDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return '';
+  }
+}
+
 // Inisialisasi Opsi Kelas sesuai Divisi
 function initClassDropdown() {
   if (!studentClassSelect) return;
-  // Periksa apakah opsi kelas sudah ada selain placeholder
   if (studentClassSelect.options.length <= 1) {
     studentClassSelect.innerHTML = '<option value="" disabled selected>-- Pilih Kelas Terlebih Dahulu --</option>';
     CONFIG.classes.forEach(cls => {
@@ -88,7 +116,8 @@ function initClassDropdown() {
 async function handleClassChange(classVal) {
   if (!classVal) return;
 
-  // 1. Reset dropdown Siswa & field VA, WA, Email
+  // 1. Reset riwayat pesanan siswa, dropdown Siswa & field VA, WA, Email
+  currentStudentOrderedBooks = [];
   studentNameSelect.innerHTML = '<option value="" disabled selected>Memuat data siswa...</option>';
   studentNameSelect.disabled = true;
   vaNumberInput.value = '';
@@ -169,12 +198,122 @@ function populateStudentDropdown(students) {
   studentNameSelect.disabled = false;
 }
 
-// Handle saat Nama Siswa dipilih -> Otomatis isi VA, WA, dan Email
-function handleStudentSelect(studentName) {
+// Cek apakah buku tertentu sudah pernah dipesan oleh siswa yang dipilih
+function isBookOrdered(book) {
+  if (!currentStudentOrderedBooks || currentStudentOrderedBooks.length === 0) return false;
+  const targetName = (book.name || '').trim().toLowerCase();
+  return currentStudentOrderedBooks.some(ob => {
+    if (ob.book_id && Number(ob.book_id) === Number(book.id)) return true;
+    if (ob.name && ob.name.trim().toLowerCase() === targetName) return true;
+    return false;
+  });
+}
+
+// Pastikan modal konfirmasi riwayat pesanan tersedia di DOM
+function ensureDuplicateModal() {
+  let modal = document.getElementById('duplicate-warning-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'duplicate-warning-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 500px; text-align: left; padding: 28px;">
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(245, 158, 11, 0.15); color: #D97706; width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0;">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary-navy); margin: 0;">Riwayat Pesanan Terdeteksi</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;" id="duplicate-modal-student-name">Untuk siswa: -</p>
+        </div>
+      </div>
+      
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: var(--border-radius-md); padding: 14px 16px; margin-bottom: 16px;">
+        <p style="font-size: 0.9rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">
+          Ayah/Bunda sudah memesan buku:
+        </p>
+        <ul id="duplicate-books-list" class="duplicate-modal-list">
+          <!-- Dynamic items -->
+        </ul>
+      </div>
+
+      <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 20px;">
+        Ayah/Bunda hanya bisa memesan lagi buku yang belum dipesan. Jika Ayah/Bunda ingin membatalkan pesanan buku sebelumnya, silakan hubungi admin sekolah.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" id="btn-confirm-duplicate" class="btn-order" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+          <i class="fa-solid fa-check"></i> Saya Mengerti & Lanjutkan
+        </button>
+        <a href="#" id="duplicate-wa-admin-btn" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; background: #25D366; color: #FFF; font-weight: 600; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);">
+          <i class="fa-brands fa-whatsapp" style="font-size: 1.15rem;"></i> Hubungi Admin Sekolah via WhatsApp
+        </a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const confirmBtn = modal.querySelector('#btn-confirm-duplicate');
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      modal.classList.remove('show');
+    };
+  }
+
+  return modal;
+}
+
+// Tampilkan popup/modal konfirmasi jika siswa telah memiliki riwayat pesanan
+function showDuplicateModal(studentName, orderedBooks) {
+  const modal = ensureDuplicateModal();
+  const studentNameEl = modal.querySelector('#duplicate-modal-student-name');
+  const booksListEl = modal.querySelector('#duplicate-books-list');
+  const waBtnEl = modal.querySelector('#duplicate-wa-admin-btn');
+  const confirmBtn = modal.querySelector('#btn-confirm-duplicate');
+
+  if (studentNameEl) {
+    const classVal = studentClassSelect ? studentClassSelect.value : '';
+    studentNameEl.textContent = `Untuk Siswa: ${studentName}${classVal ? ' (Kelas ' + classVal + ')' : ''}`;
+  }
+
+  if (booksListEl) {
+    booksListEl.innerHTML = '';
+    orderedBooks.forEach(book => {
+      const li = document.createElement('li');
+      const dateFormatted = formatOrderDate(book.order_date || book.created_at);
+      const dateText = dateFormatted ? ` <span style="color: var(--text-muted); font-size: 0.8rem;">(Dipesan: ${dateFormatted})</span>` : '';
+      li.innerHTML = `<strong>${escapeHtml(book.name)}</strong>${dateText}`;
+      booksListEl.appendChild(li);
+    });
+  }
+
+  if (waBtnEl) {
+    const cleanWaTarget = (CONFIG.waTarget || '').replace(/[^0-9]/g, '');
+    const booksListText = orderedBooks.map(b => `- ${b.name}`).join('\n');
+    const waText = `Assalamu'alaikum Admin ${CONFIG.divisionName}. Saya orang tua dari ${studentName} (Kelas ${studentClassSelect ? studentClassSelect.value : ''}, No VA: ${vaNumberInput ? vaNumberInput.value : ''}). Siswa sudah memesan buku:\n${booksListText}\nSaya ingin berkonsultasi / membatalkan pesanan buku tersebut. Mohon bantuannya. Jazakumullahu Khairan.`;
+    waBtnEl.href = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
+  }
+
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      modal.classList.remove('show');
+    };
+  }
+
+  modal.classList.add('show');
+}
+
+// Handle saat Nama Siswa dipilih -> Otomatis isi data & periksa riwayat pesanan sebelumnya
+async function handleStudentSelect(studentName) {
   if (!studentName) {
     vaNumberInput.value = '';
     parentWhatsappInput.value = '';
     parentEmailInput.value = '';
+    currentStudentOrderedBooks = [];
+    selectedBookIds.clear();
+    calculateTotal();
+    renderBooksList();
     return;
   }
 
@@ -183,6 +322,35 @@ function handleStudentSelect(studentName) {
     vaNumberInput.value = selectedOption.dataset.va || '';
     parentWhatsappInput.value = selectedOption.dataset.wa || '';
     parentEmailInput.value = selectedOption.dataset.email || '';
+  }
+
+  // Bersihkan buku yang sedang dicentang sebelum berganti siswa
+  selectedBookIds.clear();
+  calculateTotal();
+
+  const vaNumber = vaNumberInput.value.trim();
+
+  try {
+    const res = await fetch(`/api/orders/check-student?division=${encodeURIComponent(CONFIG.division)}&student_name=${encodeURIComponent(studentName)}&va_number=${encodeURIComponent(vaNumber)}`);
+    if (res.ok) {
+      const data = await res.json();
+      currentStudentOrderedBooks = data.orderedBooks || data.ordered_books || [];
+
+      // Render ulang checklist buku dengan status dinonaktifkan untuk buku yang sudah pernah dipesan
+      renderBooksList();
+
+      // Jika ada riwayat buku yang sudah dipesan, munculkan modal konfirmasi
+      if (currentStudentOrderedBooks.length > 0) {
+        showDuplicateModal(studentName, currentStudentOrderedBooks);
+      }
+    } else {
+      currentStudentOrderedBooks = [];
+      renderBooksList();
+    }
+  } catch (err) {
+    console.error('Gagal memeriksa riwayat pesanan siswa:', err);
+    currentStudentOrderedBooks = [];
+    renderBooksList();
   }
 }
 
@@ -201,17 +369,61 @@ function renderBooksList() {
 
   booksListContainer.innerHTML = '';
 
+  const studentName = studentNameSelect.value;
+  const allOrdered = studentName && loadedBooks.length > 0 && loadedBooks.every(isBookOrdered);
+
+  // Jika semua buku untuk kelas ini sudah pernah dipesan oleh siswa ini
+  if (allOrdered) {
+    const cleanWaTarget = (CONFIG.waTarget || '').replace(/[^0-9]/g, '');
+    const waText = `Assalamu'alaikum Admin ${CONFIG.divisionName}. Saya orang tua dari ${studentName} (Kelas ${studentClassSelect.value}, No VA: ${vaNumberInput.value}). Semua buku untuk siswa ini sudah tercatat dipesan. Saya ingin konfirmasi / membatalkan pesanan. Mohon bantuannya. Jazakumullahu Khairan.`;
+    const waUrl = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
+
+    const noticeCard = document.createElement('div');
+    noticeCard.className = 'all-books-ordered-card';
+    noticeCard.innerHTML = `
+      <div class="all-books-ordered-icon">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h3 class="all-books-ordered-title">Semua Buku Kelas ${studentClassSelect.value} Sudah Pernah Dipesan</h3>
+      <p class="all-books-ordered-desc">
+        Ayah/Bunda sudah memesan seluruh buku untuk <strong>${escapeHtml(studentName)}</strong>. Tidak ada buku lain yang perlu dipesan.
+      </p>
+      <p style="font-size: 0.82rem; color: #166534; margin-bottom: 16px;">
+        Jika Ayah/Bunda ingin membatalkan pesanan buku sebelumnya atau membutuhkan bantuan, silakan hubungi admin sekolah:
+      </p>
+      <a href="${waUrl}" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; background: #25D366; color: #FFF; font-weight: 700; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);">
+        <i class="fa-brands fa-whatsapp" style="font-size: 1.2rem;"></i> Hubungi Admin via WhatsApp
+      </a>
+    `;
+    booksListContainer.appendChild(noticeCard);
+  }
+
   loadedBooks.forEach(book => {
+    const ordered = isBookOrdered(book);
+
     const label = document.createElement('label');
-    label.className = 'book-item-label';
+    label.className = `book-item-label ${ordered ? 'book-item-ordered' : ''}`;
     label.id = `book-label-${book.id}`;
+    if (ordered) {
+      label.title = 'Buku ini sudah pernah dipesan sebelumnya untuk siswa ini.';
+    }
 
     // Checkbox input
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.className = 'book-checkbox';
     input.value = book.id;
-    input.onchange = (e) => handleBookToggle(e, book.id, label);
+
+    if (ordered) {
+      input.disabled = true;
+      input.checked = false;
+    } else {
+      input.checked = selectedBookIds.has(book.id);
+      if (input.checked) {
+        label.classList.add('selected-row');
+      }
+      input.onchange = (e) => handleBookToggle(e, book.id, label);
+    }
 
     // Custom checkmark
     const checkmark = document.createElement('span');
@@ -231,6 +443,14 @@ function renderBooksList() {
 
     details.appendChild(name);
     details.appendChild(publisher);
+
+    // Tampilkan badge "Sudah Dipesan" jika buku sudah pernah dibeli siswa ini
+    if (ordered) {
+      const badge = document.createElement('span');
+      badge.className = 'badge-ordered-book';
+      badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Sudah Dipesan';
+      details.appendChild(badge);
+    }
 
     // Price
     const price = document.createElement('span');
@@ -309,6 +529,17 @@ async function handleFormSubmit(event) {
     return;
   }
 
+  // Validasi keamanan di frontend: pastikan tidak ada buku yang sudah pernah dipesan yang ikut terkirim
+  const duplicateSelected = Array.from(selectedBookIds).filter(id => {
+    const book = loadedBooks.find(b => b.id === id);
+    return book && isBookOrdered(book);
+  });
+
+  if (duplicateSelected.length > 0) {
+    showToast('Terdapat buku yang sudah pernah dipesan sebelumnya. Silakan pilih hanya buku yang belum dipesan.', 'error');
+    return;
+  }
+
   const orderData = {
     division: CONFIG.division,
     student_name: studentName,
@@ -353,6 +584,7 @@ async function handleFormSubmit(event) {
     document.getElementById('booking-form').reset();
     booksSection.style.display = 'none';
     selectedBookIds.clear();
+    currentStudentOrderedBooks = [];
     calculateTotal();
 
     // Tampilkan Modal Sukses

@@ -125,6 +125,43 @@
     </div>
   </div>
 
+  <!-- Duplicate Orders Notice Modal -->
+  <div id="duplicate-warning-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px; text-align: left; padding: 28px;">
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(245, 158, 11, 0.15); color: #D97706; width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0;">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary-navy); margin: 0;">Riwayat Pesanan Terdeteksi</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;" id="duplicate-modal-student-name">Untuk siswa: -</p>
+        </div>
+      </div>
+      
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: var(--border-radius-md); padding: 14px 16px; margin-bottom: 16px;">
+        <p style="font-size: 0.9rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">
+          Ayah/Bunda sudah memesan buku:
+        </p>
+        <ul id="duplicate-books-list" class="duplicate-modal-list">
+          <!-- Dynamic items -->
+        </ul>
+      </div>
+
+      <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 20px;">
+        Ayah/Bunda hanya bisa memesan lagi buku yang belum dipesan. Jika Ayah/Bunda ingin membatalkan pesanan buku sebelumnya, silakan hubungi admin sekolah.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" id="btn-confirm-duplicate" class="btn-order" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+          <i class="fa-solid fa-check"></i> Saya Mengerti & Lanjutkan
+        </button>
+        <a href="#" id="duplicate-wa-admin-btn" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; background: #25D366; color: #FFF; font-weight: 600; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);">
+          <i class="fa-brands fa-whatsapp" style="font-size: 1.15rem;"></i> Hubungi Admin Sekolah via WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- Modular Order script -->
   <script src="/js/order.js"></script>
 </body>

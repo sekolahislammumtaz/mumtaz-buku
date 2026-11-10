@@ -337,6 +337,111 @@ select.form-control {
   margin-left: 10px;
 }
 
+/* Already Ordered Book Styling */
+.book-item-label.book-item-ordered {
+  background-color: #F8FAFC;
+  border-color: #E2E8F0;
+  cursor: not-allowed;
+  opacity: 0.88;
+}
+
+.book-item-label.book-item-ordered:hover {
+  border-color: #CBD5E1;
+  transform: none;
+  box-shadow: none;
+}
+
+.book-item-label.book-item-ordered .custom-checkmark {
+  background-color: #E2E8F0;
+  border-color: #CBD5E1;
+  cursor: not-allowed;
+}
+
+.book-item-label.book-item-ordered .custom-checkmark:after {
+  display: none !important;
+}
+
+.book-item-label.book-item-ordered .book-name {
+  color: #475569;
+}
+
+.book-item-label.book-item-ordered .book-price {
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.badge-ordered-book {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-top: 4px;
+  width: fit-content;
+}
+
+/* Banner when all books in class are already ordered */
+.all-books-ordered-card {
+  background: #F0FDF4;
+  border: 2px dashed #86EFAC;
+  border-radius: var(--border-radius-md);
+  padding: 24px 20px;
+  text-align: center;
+  margin-bottom: 20px;
+  animation: fadeInDown 0.4s ease;
+}
+
+.all-books-ordered-icon {
+  width: 54px;
+  height: 54px;
+  background: #DCFCE7;
+  color: #16A34A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  margin: 0 auto 12px;
+}
+
+.all-books-ordered-title {
+  color: #166534;
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.all-books-ordered-desc {
+  color: #15803D;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.duplicate-modal-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.duplicate-modal-list li {
+  margin-bottom: 6px;
+}
+
+.duplicate-modal-list li:last-child {
+  margin-bottom: 0;
+}
+
 /* Bottom Floating Summary bar */
 .bottom-bar {
   position: fixed;
