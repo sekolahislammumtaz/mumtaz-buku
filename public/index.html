@@ -51,63 +51,60 @@
       <div class="landing-card">
         <h2 class="landing-title">Selamat Datang Ayah & Bunda</h2>
         <p class="landing-subtitle">
-          Silakan pilih unit sekolah putra/putri Anda untuk memulai proses pemesanan buku sekolah.
+          Silakan pilih unit sekolah putra/putri Anda untuk memulai proses pemesanan buku sekolah:
         </p>
 
-        <!-- Dropdown Division Form -->
-        <form onsubmit="handleDivisionRedirect(event)">
-          <div class="division-select-box">
-            <label for="division-select" style="font-size: 0.9rem; font-weight: 700; color: var(--primary-navy); margin-bottom: 8px; display: block;">
-              <i class="fa-solid fa-school"></i> Pilih Unit Sekolah:
-            </label>
-            <select id="division-select" class="form-control" required style="font-weight: 600; padding: 14px 16px; font-size: 1rem; border: 2px solid #CBD5E1;">
-              <option value="" disabled selected>-- Pilih Sekolah --</option>
-              <option value="sd">SD Islam Nazhirah (Kelas 1 - 6)</option>
-              <option value="smp_sma">SMP & SMA Islam Nazhirah (Kelas 7 - 12)</option>
-              <option value="mumtaz">Sekolah Islam Mumtaz (Kelas 7 - 12)</option>
-            </select>
-          </div>
-
-          <button type="submit" class="btn-confirm">
-            <span>Konfirmasi & Lanjutkan</span>
-            <i class="fa-solid fa-arrow-right"></i>
-          </button>
-        </form>
-
-        <!-- Separator -->
-        <div style="display: flex; align-items: center; gap: 12px; margin: 28px 0 16px;">
-          <div style="flex: 1; height: 1px; background: #E2E8F0;"></div>
-          <span style="font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: #94A3B8; letter-spacing: 0.5px;">Atau Akses Cepat</span>
-          <div style="flex: 1; height: 1px; background: #E2E8F0;"></div>
-        </div>
-
-        <!-- School Cards Quick Access -->
+        <!-- School Cards Selection -->
         <div class="school-cards-grid">
-          <a href="pesan-sd.html" class="school-card-btn sd">
-            <img src="/images/sd.png" alt="SD Islam Nazhirah">
+          <a href="pesan-sd.html" class="school-card-btn sd" title="Pemesanan Buku SD Islam Nazhirah">
+            <div class="school-card-logo-wrap">
+              <img src="/images/sd.png" alt="SD Islam Nazhirah">
+            </div>
             <div class="school-card-info">
               <h4>SD Islam Nazhirah</h4>
-              <p>Pemesanan Buku Kelas 1 s/d Kelas 6</p>
+              <p>Pemesanan Buku Paket & Modul</p>
+              <div class="school-card-badges">
+                <span class="school-badge sd"><i class="fa-solid fa-graduation-cap"></i> Kelas 1 s/d 6</span>
+              </div>
             </div>
-            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+            <div class="school-card-action">
+              <span class="action-text">Pesan</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </div>
           </a>
 
-          <a href="pesan-smp-sma.html" class="school-card-btn smp-sma">
-            <img src="/images/nz.png" alt="SMP & SMA Islam Nazhirah">
+          <a href="pesan-smp-sma.html" class="school-card-btn smp-sma" title="Pemesanan Buku SMP & SMA Islam Nazhirah">
+            <div class="school-card-logo-wrap">
+              <img src="/images/nz.png" alt="SMP & SMA Islam Nazhirah">
+            </div>
             <div class="school-card-info">
               <h4>SMP & SMA Islam Nazhirah</h4>
-              <p>Pemesanan Buku Kelas 7 s/d Kelas 12</p>
+              <p>Pemesanan Buku Paket & Modul</p>
+              <div class="school-card-badges">
+                <span class="school-badge smp-sma"><i class="fa-solid fa-graduation-cap"></i> Kelas 7 s/d 12</span>
+              </div>
             </div>
-            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+            <div class="school-card-action">
+              <span class="action-text">Pesan</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </div>
           </a>
 
-          <a href="pesan-mumtaz.html" class="school-card-btn mumtaz">
-            <img src="/images/logo.png" alt="Sekolah Islam Mumtaz">
+          <a href="pesan-mumtaz.html" class="school-card-btn mumtaz" title="Pemesanan Buku Sekolah Islam Mumtaz">
+            <div class="school-card-logo-wrap">
+              <img src="/images/logo.png" alt="Sekolah Islam Mumtaz">
+            </div>
             <div class="school-card-info">
               <h4>Sekolah Islam Mumtaz</h4>
-              <p>Pemesanan Buku Kelas 7 s/d Kelas 12</p>
+              <p>Pemesanan Buku Paket & Modul</p>
+              <div class="school-card-badges">
+                <span class="school-badge mumtaz"><i class="fa-solid fa-graduation-cap"></i> Kelas 7 s/d 12</span>
+              </div>
             </div>
-            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+            <div class="school-card-action">
+              <span class="action-text">Pesan</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </div>
           </a>
         </div>
       </div>
@@ -123,20 +120,5 @@
       </a>
     </footer>
   </div>
-
-  <script>
-    function handleDivisionRedirect(e) {
-      e.preventDefault();
-      const division = document.getElementById('division-select').value;
-      if (!division) return;
-      if (division === 'sd') {
-        window.location.href = 'pesan-sd.html';
-      } else if (division === 'smp_sma') {
-        window.location.href = 'pesan-smp-sma.html';
-      } else if (division === 'mumtaz') {
-        window.location.href = 'pesan-mumtaz.html';
-      }
-    }
-  </script>
 </body>
 </html>

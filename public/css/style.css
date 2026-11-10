@@ -1204,70 +1204,188 @@ body.theme-mumtaz {
   box-shadow: 0 8px 20px rgba(27, 54, 93, 0.4);
 }
 
-/* School Cards Quick Grid */
+/* School Cards Navigation Grid */
 .school-cards-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-top: 24px;
   text-align: left;
 }
 .school-card-btn {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: var(--border-radius-md);
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: 16px;
   border: 2px solid #E2E8F0;
-  background: #FFF;
+  background: #FFFFFF;
   text-decoration: none;
-  transition: var(--transition);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.school-card-btn::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  transition: width 0.25s ease;
+}
+.school-card-btn.sd::before {
+  background: #af4a87;
+}
+.school-card-btn.smp-sma::before {
+  background: #541d68;
+}
+.school-card-btn.mumtaz::before {
+  background: #1B365D;
 }
 .school-card-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.09);
+}
+.school-card-btn:hover::before {
+  width: 10px;
 }
 .school-card-btn.sd:hover {
   border-color: #af4a87;
-  background: #fdf4f9;
+  background: #FDF7FA;
 }
 .school-card-btn.smp-sma:hover {
   border-color: #541d68;
-  background: #faf4fb;
+  background: #FAF6FB;
 }
 .school-card-btn.mumtaz:hover {
   border-color: #1B365D;
-  background: #f3f6fa;
+  background: #F4F7FB;
 }
-.school-card-btn img {
-  width: 52px;
-  height: 52px;
+.school-card-logo-wrap {
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+  border: 1px solid #E2E8F0;
+  padding: 5px;
+  transition: transform 0.25s ease;
+}
+.school-card-btn:hover .school-card-logo-wrap {
+  transform: scale(1.06);
+}
+.school-card-logo-wrap img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  border-radius: 50%;
-  padding: 2px;
-  background: #FFF;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.school-card-info {
+  flex: 1;
+  min-width: 0;
 }
 .school-card-info h4 {
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: 2px;
+  color: #1E293B;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
 }
 .school-card-info p {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-size: 0.83rem;
+  color: #64748B;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
 }
-.school-card-arrow {
-  margin-left: auto;
-  color: #94A3B8;
-  font-size: 1.1rem;
-  transition: var(--transition);
+.school-card-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
-.school-card-btn:hover .school-card-arrow {
+.school-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+.school-badge.sd {
+  background: #FCE7F3;
+  color: #9D174D;
+  border: 1px solid #FBCFE8;
+}
+.school-badge.smp-sma {
+  background: #F3E8FF;
+  color: #541d68;
+  border: 1px solid #E9D5FF;
+}
+.school-badge.mumtaz {
+  background: #E0E7FF;
+  color: #1E3A8A;
+  border: 1px solid #C7D2FE;
+}
+.school-card-action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #475569;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  transition: all 0.25s ease;
+}
+.school-card-btn.sd:hover .school-card-action {
+  background: #af4a87;
+  color: #FFFFFF;
+  border-color: #af4a87;
+  box-shadow: 0 4px 12px rgba(175, 74, 135, 0.35);
+}
+.school-card-btn.smp-sma:hover .school-card-action {
+  background: #541d68;
+  color: #FFFFFF;
+  border-color: #541d68;
+  box-shadow: 0 4px 12px rgba(84, 29, 104, 0.35);
+}
+.school-card-btn.mumtaz:hover .school-card-action {
+  background: #1B365D;
+  color: #FFFFFF;
+  border-color: #1B365D;
+  box-shadow: 0 4px 12px rgba(27, 54, 93, 0.35);
+}
+.school-card-btn:hover .school-card-action i {
   transform: translateX(4px);
-  color: var(--text-dark);
+  transition: transform 0.2s ease;
+}
+@media (max-width: 480px) {
+  .school-card-btn {
+    padding: 14px;
+    gap: 12px;
+  }
+  .school-card-logo-wrap {
+    width: 48px;
+    height: 48px;
+  }
+  .school-card-info h4 {
+    font-size: 0.98rem;
+  }
+  .school-card-action {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
 }
 
 /* Admin Link in Header / Footer */
