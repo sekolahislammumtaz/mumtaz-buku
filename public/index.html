@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pemesanan Buku Sekolah Islam Nazhirah dan Sekolah Islam Mumtaz</title>
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-mumtaz">
+  <!-- Decorative background -->
+  <div class="page-bg"></div>
+  <div class="page-bg-circles"></div>
+
+  <!-- Top bar with Admin Link -->
+  <div style="position: absolute; top: 16px; right: 16px; z-index: 10;">
+    <a href="/admin.html" class="landing-admin-link">
+      <i class="fa-solid fa-user-shield"></i> Panel Admin
+    </a>
+  </div>
+
+  <div class="container" style="max-width: 620px; padding-top: 40px; padding-bottom: 60px;">
+    <!-- Landing Header with Logos -->
+    <header class="landing-header">
+      <div class="landing-logos">
+        <a href="pesan-sd.html" class="landing-logo-item sd" title="SD Islam Nazhirah">
+          <img src="/images/sd.png" alt="SD Islam Nazhirah" class="landing-logo-img">
+          <span class="landing-logo-label">SD Nazhirah</span>
+        </a>
+        <a href="pesan-smp-sma.html" class="landing-logo-item smp-sma" title="SMP & SMA Islam Nazhirah">
+          <img src="/images/nz.png" alt="SMP & SMA Islam Nazhirah" class="landing-logo-img">
+          <span class="landing-logo-label">SMP & SMA Nazhirah</span>
+        </a>
+        <a href="pesan-mumtaz.html" class="landing-logo-item mumtaz" title="Sekolah Islam Mumtaz">
+          <img src="/images/logo.png" alt="Sekolah Islam Mumtaz" class="landing-logo-img">
+          <span class="landing-logo-label">Sekolah Mumtaz</span>
+        </a>
+      </div>
+      <h1 class="school-title" style="font-size: 1.6rem; color: #FFF; text-shadow: 0 2px 8px rgba(0,0,0,0.4);">
+        Pemesanan Buku Sekolah
+      </h1>
+      <p class="school-subtitle" style="font-size: 0.95rem; color: rgba(255,255,255,0.85); text-transform: none; letter-spacing: 0; margin-top: 6px;">
+        Sekolah Islam Nazhirah & Sekolah Islam Mumtaz
+      </p>
+    </header>
+
+    <!-- Main Selection Card -->
+    <main>
+      <div class="landing-card">
+        <h2 class="landing-title">Selamat Datang Ayah & Bunda</h2>
+        <p class="landing-subtitle">
+          Silakan pilih unit sekolah putra/putri Anda untuk memulai proses pemesanan buku sekolah.
+        </p>
+
+        <!-- Dropdown Division Form -->
+        <form onsubmit="handleDivisionRedirect(event)">
+          <div class="division-select-box">
+            <label for="division-select" style="font-size: 0.9rem; font-weight: 700; color: var(--primary-navy); margin-bottom: 8px; display: block;">
+              <i class="fa-solid fa-school"></i> Pilih Unit Sekolah:
+            </label>
+            <select id="division-select" class="form-control" required style="font-weight: 600; padding: 14px 16px; font-size: 1rem; border: 2px solid #CBD5E1;">
+              <option value="" disabled selected>-- Pilih Sekolah --</option>
+              <option value="sd">SD Islam Nazhirah (Kelas 1 - 6)</option>
+              <option value="smp_sma">SMP & SMA Islam Nazhirah (Kelas 7 - 12)</option>
+              <option value="mumtaz">Sekolah Islam Mumtaz (Kelas 7 - 12)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-confirm">
+            <span>Konfirmasi & Lanjutkan</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+
+        <!-- Separator -->
+        <div style="display: flex; align-items: center; gap: 12px; margin: 28px 0 16px;">
+          <div style="flex: 1; height: 1px; background: #E2E8F0;"></div>
+          <span style="font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: #94A3B8; letter-spacing: 0.5px;">Atau Akses Cepat</span>
+          <div style="flex: 1; height: 1px; background: #E2E8F0;"></div>
+        </div>
+
+        <!-- School Cards Quick Access -->
+        <div class="school-cards-grid">
+          <a href="pesan-sd.html" class="school-card-btn sd">
+            <img src="/images/sd.png" alt="SD Islam Nazhirah">
+            <div class="school-card-info">
+              <h4>SD Islam Nazhirah</h4>
+              <p>Pemesanan Buku Kelas 1 s/d Kelas 6</p>
+            </div>
+            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+          </a>
+
+          <a href="pesan-smp-sma.html" class="school-card-btn smp-sma">
+            <img src="/images/nz.png" alt="SMP & SMA Islam Nazhirah">
+            <div class="school-card-info">
+              <h4>SMP & SMA Islam Nazhirah</h4>
+              <p>Pemesanan Buku Kelas 7 s/d Kelas 12</p>
+            </div>
+            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+          </a>
+
+          <a href="pesan-mumtaz.html" class="school-card-btn mumtaz">
+            <img src="/images/logo.png" alt="Sekolah Islam Mumtaz">
+            <div class="school-card-info">
+              <h4>Sekolah Islam Mumtaz</h4>
+              <p>Pemesanan Buku Kelas 7 s/d Kelas 12</p>
+            </div>
+            <i class="fa-solid fa-chevron-right school-card-arrow"></i>
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+      <p style="margin-bottom: 8px;">
+        &copy; 2026 Portal Pemesanan Buku Sekolah Islam Nazhirah & Sekolah Islam Mumtaz.
+      </p>
+      <a href="/admin.html" class="landing-admin-link" style="margin-top: 8px;">
+        <i class="fa-solid fa-lock"></i> Masuk ke Panel Administrator
+      </a>
+    </footer>
+  </div>
+
+  <script>
+    function handleDivisionRedirect(e) {
+      e.preventDefault();
+      const division = document.getElementById('division-select').value;
+      if (!division) return;
+      if (division === 'sd') {
+        window.location.href = 'pesan-sd.html';
+      } else if (division === 'smp_sma') {
+        window.location.href = 'pesan-smp-sma.html';
+      } else if (division === 'mumtaz') {
+        window.location.href = 'pesan-mumtaz.html';
+      }
+    }
+  </script>
+</body>
+</html>

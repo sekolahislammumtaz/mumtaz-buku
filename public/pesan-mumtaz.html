@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pemesanan Buku - Sekolah Islam Mumtaz</title>
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-mumtaz" data-division="mumtaz" data-division-name="Sekolah Islam Mumtaz" data-wa-target="628999741234" data-classes="7,8,9,10,11,12">
+  <!-- Decorative background -->
+  <div class="page-bg"></div>
+  <div class="page-bg-circles"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="container">
+    <!-- Back to selection link -->
+    <a href="index.html" class="btn-back">
+      <i class="fa-solid fa-arrow-left"></i> Pilih Sekolah Lain
+    </a>
+
+    <!-- Header Card -->
+    <header class="header-card">
+      <img src="/images/logo.png" alt="Logo Sekolah Islam Mumtaz" class="school-logo">
+      <h1 class="school-title">Sekolah Islam Mumtaz</h1>
+      <p class="school-subtitle">Pemesanan Buku Sekolah</p>
+    </header>
+
+    <!-- Parent Form Card -->
+    <main>
+      <form id="booking-form" onsubmit="handleFormSubmit(event)">
+        <div class="form-card">
+          <h2 class="section-title">
+            <i class="fa-solid fa-user-graduate"></i> Informasi Siswa & Orang Tua
+          </h2>
+
+          <!-- 1. Dropdown Kelas (Langkah Pertama) -->
+          <div class="form-group">
+            <label for="student-class"><i class="fa-solid fa-graduation-cap"></i> 1. Pilih Kelas</label>
+            <select id="student-class" class="form-control" required onchange="handleClassChange(this.value)">
+              <option value="" disabled selected>-- Pilih Kelas Terlebih Dahulu --</option>
+              <option value="7">Kelas 7</option>
+              <option value="8">Kelas 8</option>
+              <option value="9">Kelas 9</option>
+              <option value="10">Kelas 10</option>
+              <option value="11">Kelas 11</option>
+              <option value="12">Kelas 12</option>
+            </select>
+          </div>
+
+          <!-- 2. Dropdown Nama Lengkap Siswa (Langkah Kedua) -->
+          <div class="form-group">
+            <label for="student-name-select"><i class="fa-solid fa-user"></i> 2. Nama Lengkap Siswa</label>
+            <select id="student-name-select" class="form-control" required onchange="handleStudentSelect(this.value)" disabled>
+              <option value="" disabled selected>-- Pilih Kelas Terlebih Dahulu --</option>
+            </select>
+          </div>
+
+          <!-- 3. Nomor Virtual Account (VA) (Readonly) -->
+          <div class="form-group">
+            <label for="va-number"><i class="fa-solid fa-credit-card"></i> Nomor Virtual Account (VA)</label>
+            <input type="text" id="va-number" class="form-control readonly-input" placeholder="Otomatis terisi setelah memilih siswa..." readonly required>
+          </div>
+
+          <!-- 4. Nomor WhatsApp Orang Tua (Readonly) -->
+          <div class="form-group">
+            <label for="parent-whatsapp"><i class="fa-brands fa-whatsapp"></i> Nomor WhatsApp Orang Tua</label>
+            <input type="tel" id="parent-whatsapp" class="form-control readonly-input" placeholder="Otomatis terisi setelah memilih siswa..." readonly required>
+          </div>
+
+          <!-- 5. Alamat Email Orang Tua (Readonly) -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="parent-email"><i class="fa-solid fa-envelope"></i> Alamat Email Orang Tua</label>
+            <input type="email" id="parent-email" class="form-control readonly-input" placeholder="Otomatis terisi setelah memilih siswa..." readonly required>
+          </div>
+        </div>
+
+        <!-- Dynamic Books Checklist Card -->
+        <div id="books-section" class="books-card">
+          <h2 class="section-title">
+            <i class="fa-solid fa-book-open"></i> Pilih Buku yang Dipesan
+          </h2>
+          <p class="school-subtitle" style="color: var(--text-muted); font-size: 0.8rem; margin-top: -12px; margin-bottom: 16px; text-transform: none; letter-spacing: 0;">
+            * Centang buku yang ingin dibeli. Anda dapat memilih sebagian atau seluruh paket buku.
+          </p>
+
+          <div id="books-list" class="books-list">
+            <!-- Books will be loaded here dynamically -->
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <!-- Bottom Floating Summary Bar -->
+  <div id="bottom-bar" class="bottom-bar">
+    <div class="bottom-bar-content">
+      <div class="price-summary">
+        <span class="summary-label">Total Harga</span>
+        <span id="price-total" class="summary-total">Rp 0</span>
+      </div>
+      <button type="submit" form="booking-form" class="btn-order">
+        <i class="fa-solid fa-cart-shopping"></i> Pesan Buku
+      </button>
+    </div>
+  </div>
+
+  <!-- Success Confirmation Modal -->
+  <div id="success-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-icon" style="background: rgba(37, 211, 102, 0.1); width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #25D366; font-size: 2.2rem;">
+        <i class="fa-brands fa-whatsapp"></i>
+      </div>
+      <h3 class="modal-title" style="color: var(--primary-navy); font-size: 1.4rem; font-weight: 800; margin-bottom: 8px;">Pesanan Disimpan!</h3>
+      <p class="modal-desc" style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">
+        Data pemesanan buku untuk <strong>Sekolah Islam Mumtaz</strong> berhasil dicatat di server. Sistem akan menghubungkan Anda ke WhatsApp resmi admin sekolah.
+      </p>
+      <a href="#" id="whatsapp-btn" target="_blank" class="btn-whatsapp-redirect" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; background: #25D366; color: #FFF; font-weight: 700; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 1rem; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);">
+        <i class="fa-brands fa-whatsapp" style="font-size: 1.3rem;"></i> Kirim Pesanan via WhatsApp
+      </a>
+    </div>
+  </div>
+
+  <!-- Modular Order script -->
+  <script src="/js/order.js"></script>
+</body>
+</html>
