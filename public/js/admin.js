@@ -543,6 +543,28 @@ async function exportOrdersToExcel() {
   }
 }
 
+// Export Invoice to Excel
+async function exportInvoiceToExcel() {
+  try {
+    showToast('Menyiapkan file invoice Excel...', 'success');
+    const response = await apiFetch('/api/admin/orders/export-invoice');
+    if (!response.ok) throw new Error('Ekspor invoice gagal');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice_pesanan_${activeDivision}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    showToast('File invoice Excel berhasil diunduh.', 'success');
+  } catch (error) {
+    showToast('Gagal mengekspor data invoice ke Excel.', 'error');
+  }
+}
+
 // Export Recap per Class to Excel
 async function exportRecapToExcel() {
   const classVal = document.getElementById('recap-class-select').value;

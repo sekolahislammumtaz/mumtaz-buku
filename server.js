@@ -720,6 +720,121 @@ app.get('/api/admin/orders/export', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Helper to format phone number to standard +62...
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/[^\d+]/g, '').trim();
+  if (!cleaned) return '';
+  if (cleaned.startsWith('+62')) return cleaned;
+  if (cleaned.startsWith('62')) return '+' + cleaned;
+  if (cleaned.startsWith('0')) return '+62' + cleaned.slice(1);
+  if (cleaned.startsWith('+')) return cleaned;
+  return '+62' + cleaned;
+}
+
+// GET export invoice to Excel
+app.get('/api/admin/orders/export-invoice', authenticateAdmin, async (req, res) => {
+  const division = req.admin.division || 'mumtaz';
+  try {
+    const orders = await dbQuery.all('SELECT * FROM orders WHERE division = ? ORDER BY id ASC', [division]);
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const pad3 = (n) => String(n).padStart(3, '0');
+
+    const excelData = orders.map((order, index) => {
+      const orderDate = order.created_at ? new Date(order.created_at) : new Date();
+      const validDate = isNaN(orderDate.getTime()) ? new Date() : orderDate;
+      const tahunPemesanan = validDate.getFullYear();
+
+      const waktuBerlaku = `${pad2(validDate.getDate())}/${pad2(validDate.getMonth() + 1)}/${validDate.getFullYear()}`;
+      
+      const dueDate = new Date(validDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const waktuJatuhTempo = `${pad2(dueDate.getDate())}/${pad2(dueDate.getMonth() + 1)}/${dueDate.getFullYear()}`;
+
+      const urutan = pad3(index + 1);
+      const vaNumber = order.va_number ? String(order.va_number).trim() : '';
+      const nomorInvoice = `BUKU-${tahunPemesanan}-${vaNumber}-${urutan}`;
+
+      const totalPrice = Number(order.total_price) || 0;
+
+      return {
+        nomor_invoice: nomorInvoice,
+        nomor_pembayaran: vaNumber,
+        id_pelanggan: vaNumber,
+        nama: order.student_name || '',
+        waktu_berlaku: waktuBerlaku,
+        waktu_jatuh_tempo: waktuJatuhTempo,
+        waktu_jatuh_kedaluwarsa: '',
+        info_kelas: order.class_name ? String(order.class_name) : '',
+        rincian_Buku: totalPrice,
+        rincian_Buku2: 0,
+        total_nominal: totalPrice,
+        email: order.parent_email || '',
+        nomor_hp: formatPhoneNumber(order.parent_whatsapp),
+        catatan: `Buku ${tahunPemesanan}`,
+        status_tagihan: 'Menunggu Pembayaran',
+        action_tagihan_jatuh_tempo: 'Menunggu Pembayaran',
+        action_tagihan_jatuh_kedaluwarsa: ''
+      };
+    });
+
+    const headers = [
+      'nomor_invoice',
+      'nomor_pembayaran',
+      'id_pelanggan',
+      'nama',
+      'waktu_berlaku',
+      'waktu_jatuh_tempo',
+      'waktu_jatuh_kedaluwarsa',
+      'info_kelas',
+      'rincian_Buku',
+      'rincian_Buku2',
+      'total_nominal',
+      'email',
+      'nomor_hp',
+      'catatan',
+      'status_tagihan',
+      'action_tagihan_jatuh_tempo',
+      'action_tagihan_jatuh_kedaluwarsa'
+    ];
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(excelData, { header: headers });
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 28 }, // nomor_invoice
+      { wch: 20 }, // nomor_pembayaran
+      { wch: 20 }, // id_pelanggan
+      { wch: 26 }, // nama
+      { wch: 16 }, // waktu_berlaku
+      { wch: 18 }, // waktu_jatuh_tempo
+      { wch: 24 }, // waktu_jatuh_kedaluwarsa
+      { wch: 14 }, // info_kelas
+      { wch: 16 }, // rincian_Buku
+      { wch: 16 }, // rincian_Buku2
+      { wch: 16 }, // total_nominal
+      { wch: 28 }, // email
+      { wch: 20 }, // nomor_hp
+      { wch: 16 }, // catatan
+      { wch: 24 }, // status_tagihan
+      { wch: 28 }, // action_tagihan_jatuh_tempo
+      { wch: 30 }  // action_tagihan_jatuh_kedaluwarsa
+    ];
+
+    xlsx.utils.book_append_sheet(wb, ws, 'Invoice Pesanan Buku');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const exportDateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice_pesanan_${division}_${exportDateStr}.xlsx`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Export invoice error:', error);
+    res.status(500).json({ message: 'Gagal mengekspor data invoice.' });
+  }
+});
+
 // GET export recap per class (Matrix format: Student x Books)
 app.get('/api/admin/orders/export-recap', authenticateAdmin, async (req, res) => {
   const { kelas } = req.query; // 'all' or specific class e.g. '8'
