@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tagihan Pemesanan Buku</title>
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Decorative background -->
+  <div class="page-bg"></div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="invoice-container">
+    <!-- Action Bar Atas -->
+    <div class="invoice-top-bar">
+      <a href="/" class="btn-back">
+        <i class="fa-solid fa-house"></i> Beranda
+      </a>
+      <button type="button" class="btn-print-invoice" onclick="window.print()">
+        <i class="fa-solid fa-print"></i> Cetak / Simpan PDF
+      </button>
+    </div>
+
+    <!-- State Loading -->
+    <div id="invoice-loading" class="invoice-card" style="text-align: center; padding: 48px 24px;">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--primary-navy); margin-bottom: 16px;"></i>
+      <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark);">Memuat Rincian Tagihan...</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 6px;">Mohon tunggu sejenak, sistem sedang mengambil data pesanan Anda.</p>
+    </div>
+
+    <!-- State Error -->
+    <div id="invoice-error" class="invoice-card" style="display: none; text-align: center; padding: 44px 24px;">
+      <div style="background: rgba(239, 68, 68, 0.1); width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #EF4444; font-size: 2rem;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 style="font-size: 1.35rem; font-weight: 800; color: #991B1B; margin-bottom: 10px;">Tagihan Tidak Ditemukan</h3>
+      <p id="invoice-error-msg" style="font-size: 0.95rem; color: #475569; max-width: 480px; margin: 0 auto 24px; line-height: 1.6;">
+        Tautan tagihan tidak valid, telah kedaluwarsa, atau pesanan tidak ditemukan di database sekolah.
+      </p>
+      <a href="/" class="btn-order" style="display: inline-flex; width: auto; padding: 12px 28px; text-decoration: none;">
+        <i class="fa-solid fa-arrow-left"></i> Kembali ke Menu Utama
+      </a>
+    </div>
+
+    <!-- State Berhasil / Rincian Tagihan -->
+    <div id="invoice-content" style="display: none;">
+      <main class="invoice-card">
+        <!-- Header Identitas Sekolah -->
+        <header class="invoice-header-top">
+          <div class="invoice-brand">
+            <img id="invoice-school-logo" src="/images/logo.png" alt="Logo Sekolah" class="invoice-school-logo">
+            <div>
+              <h1 id="invoice-school-name" class="invoice-brand-title">Sekolah Islam</h1>
+              <p class="invoice-brand-subtitle">Rincian Resmi Tagihan Pemesanan Buku</p>
+            </div>
+          </div>
+          <div class="invoice-meta-badge-wrap">
+            <span id="invoice-order-code" class="invoice-order-badge">-</span>
+            <div id="invoice-status-badge" class="invoice-status-badge">Menunggu Pembayaran</div>
+          </div>
+        </header>
+
+        <!-- Informasi Siswa & Pesanan -->
+        <section class="invoice-section">
+          <h2 class="invoice-section-title">
+            <i class="fa-solid fa-user-graduate"></i> Informasi Siswa &amp; Orang Tua
+          </h2>
+          <div class="invoice-grid">
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">Nama Lengkap Siswa</span>
+              <span id="invoice-student-name" class="invoice-info-value">-</span>
+            </div>
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">Kelas</span>
+              <span id="invoice-student-class" class="invoice-info-value">-</span>
+            </div>
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">No. Virtual Account (VA)</span>
+              <span id="invoice-student-va" class="invoice-info-value" style="font-family: monospace; letter-spacing: 0.5px;">-</span>
+            </div>
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">Tanggal Pemesanan</span>
+              <span id="invoice-order-date" class="invoice-info-value">-</span>
+            </div>
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">No. WhatsApp Orang Tua</span>
+              <span id="invoice-parent-wa" class="invoice-info-value">-</span>
+            </div>
+            <div class="invoice-info-item">
+              <span class="invoice-info-label">Email Orang Tua</span>
+              <span id="invoice-parent-email" class="invoice-info-value">-</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tabel Daftar Buku yang Dipesan -->
+        <section class="invoice-section">
+          <h2 class="invoice-section-title">
+            <i class="fa-solid fa-book"></i> Daftar Buku yang Dipesan
+          </h2>
+          <div class="invoice-table-wrap">
+            <table class="invoice-table">
+              <thead>
+                <tr>
+                  <th style="width: 48px; text-align: center;">No.</th>
+                  <th>Judul Buku</th>
+                  <th>Penerbit</th>
+                  <th style="text-align: right; width: 140px;">Harga</th>
+                </tr>
+              </thead>
+              <tbody id="invoice-books-tbody">
+                <!-- Dynamic rows -->
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="text-align: right; font-weight: 800;">Total Pembayaran:</td>
+                  <td id="invoice-total-amount" style="text-align: right; font-weight: 800; color: var(--primary-navy);">Rp 0</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <!-- Seksi Pembayaran QRIS Bank BSI -->
+        <section id="invoice-qris-section" class="invoice-qris-card">
+          <div class="invoice-qris-card-header">
+            <div class="invoice-qris-title">
+              <i class="fa-solid fa-qrcode"></i> Poster QRIS Resmi Bank BSI
+            </div>
+            <div id="invoice-qris-merchant" class="qris-merchant-badge">SEKOLAH ISLAM MUMTAZ</div>
+          </div>
+
+          <div style="text-align: center; margin-top: 14px; margin-bottom: 6px;">
+            <div class="qris-view-toggle">
+              <button type="button" id="toggle-view-poster" class="qris-toggle-btn active" onclick="switchQRView('poster')">
+                <i class="fa-solid fa-file-image"></i> Poster Resmi
+              </button>
+              <button type="button" id="toggle-view-code" class="qris-toggle-btn" onclick="switchQRView('code')">
+                <i class="fa-solid fa-qrcode"></i> Kode QR Saja
+              </button>
+            </div>
+          </div>
+
+          <div class="invoice-qris-box">
+            <!-- Tampilan Poster Resmi -->
+            <div id="invoice-poster-container" class="invoice-qris-poster-wrap">
+              <img id="invoice-poster-image" src="" alt="Poster QRIS Resmi Bank BSI" class="invoice-qris-poster-img">
+            </div>
+
+            <!-- Tampilan Kode QR Saja -->
+            <div id="invoice-code-container" style="display: none;">
+              <img id="invoice-qris-image" src="" alt="Kode QRIS Pembayaran Pesanan Buku" class="invoice-qris-img">
+            </div>
+
+            <div class="invoice-qris-amount-lock" style="margin-top: 14px;">
+              <i class="fa-solid fa-lock"></i> Nominal Terkunci Otomatis: <strong id="invoice-qris-locked-amount">Rp 0</strong>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin: 18px 0;">
+            <a href="#" id="invoice-poster-download-btn" class="btn-download-poster-primary" download="Poster-QRIS.png">
+              <i class="fa-solid fa-file-arrow-down"></i> Unduh Poster QRIS Resmi (PNG)
+            </a>
+            <a href="#" id="invoice-qris-download-btn" class="btn-download-qris-secondary" download="QRIS-Pesanan.png">
+              <i class="fa-solid fa-qrcode"></i> Unduh Kode QR Saja (PNG)
+            </a>
+          </div>
+
+          <!-- Panduan Ringkas Cara Bayar -->
+          <div class="invoice-qris-guide">
+            <div class="invoice-qris-guide-title">
+              <i class="fa-solid fa-circle-question"></i> Panduan Pembayaran via QRIS:
+            </div>
+            <ol class="invoice-qris-guide-list">
+              <li>Buka aplikasi <strong>BSI Mobile</strong>, <em>mobile banking</em> (BCA, Mandiri, BRI, BNI), atau <em>e-wallet</em> (GoPay, OVO, DANA, ShopeePay).</li>
+              <li>Pilih menu <strong>Scan QR / QRIS</strong>, lalu arahkan kamera ke kode QRIS di atas.</li>
+              <li><strong>Jika Anda membuka halaman ini di HP:</strong> Klik tombol <em>"Unduh Poster QRIS Resmi"</em> di atas, lalu buka menu QRIS di aplikasi perbankan Anda dan pilih ikon <strong>Upload dari Galeri / Foto</strong>.</li>
+              <li>Pastikan nama merchant penerima (<strong id="guide-merchant-name">SEKOLAH ISLAM MUMTAZ</strong>) dan total nominal telah sesuai, masukkan PIN transaksi Anda, lalu selesaikan pembayaran.</li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Fallback Jika QRIS Belum Dikonfigurasi -->
+        <section id="invoice-no-qris-section" class="modal-no-qris-note" style="display: none; margin-bottom: 24px;">
+          <i class="fa-solid fa-circle-info" style="font-size: 1.25rem;"></i>
+          <div>
+            <strong>Metode Pembayaran QRIS Sedang Disiapkan</strong><br>
+            Untuk menyelesaikan pemesanan buku ini, silakan hubungi Admin Sekolah via WhatsApp dengan mengeklik tombol di bawah guna memperoleh nomor rekening resmi dan petunjuk transfer.
+          </div>
+        </section>
+
+        <!-- Tombol Aksi WhatsApp Konfirmasi -->
+        <section class="invoice-actions-footer">
+          <a href="#" id="invoice-wa-btn" target="_blank" class="btn-whatsapp-invoice">
+            <i class="fa-brands fa-whatsapp" style="font-size: 1.3rem;"></i> Kirim Bukti Bayar ke WhatsApp Admin
+          </a>
+          <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">
+            Setelah pembayaran selesai, mohon kirimkan konfirmasi dan bukti transfer agar pesanan buku segera diproses oleh pihak sekolah.
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="/js/qris-renderer.js"></script>
+  <script>
+    // Toggle tampilan poster atau kode QR saja
+    function switchQRView(mode) {
+      const posterContainer = document.getElementById('invoice-poster-container');
+      const codeContainer = document.getElementById('invoice-code-container');
+      const btnPoster = document.getElementById('toggle-view-poster');
+      const btnCode = document.getElementById('toggle-view-code');
+
+      if (mode === 'poster') {
+        if (posterContainer) posterContainer.style.display = 'block';
+        if (codeContainer) codeContainer.style.display = 'none';
+        if (btnPoster) btnPoster.classList.add('active');
+        if (btnCode) btnCode.classList.remove('active');
+      } else {
+        if (posterContainer) posterContainer.style.display = 'none';
+        if (codeContainer) codeContainer.style.display = 'block';
+        if (btnPoster) btnPoster.classList.remove('active');
+        if (btnCode) btnCode.classList.add('active');
+      }
+    }
+    window.switchQRView = switchQRView;
+
+    // Helper format Rupiah
+    function formatRupiah(number) {
+      return 'Rp ' + Number(number || 0).toLocaleString('id-ID');
+    }
+
+    // Helper format tanggal Indonesia
+    function formatTanggalIndonesia(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '-';
+        return d.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      } catch (e) {
+        return '-';
+      }
+    }
+
+    // Escape HTML untuk mencegah XSS
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Eksekusi pemuatan data tagihan saat DOM siap
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('id');
+      const invoiceToken = urlParams.get('t');
+
+      const loadingEl = document.getElementById('invoice-loading');
+      const errorEl = document.getElementById('invoice-error');
+      const errorMsgEl = document.getElementById('invoice-error-msg');
+      const contentEl = document.getElementById('invoice-content');
+
+      if (!orderId || !invoiceToken) {
+        loadingEl.style.display = 'none';
+        errorMsgEl.textContent = 'Parameter tagihan tidak lengkap atau tautan akses tidak valid.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/invoice?t=${encodeURIComponent(invoiceToken)}`);
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Tagihan tidak ditemukan atau tautan telah kedaluwarsa.');
+        }
+
+        const data = await res.json();
+
+        // 1. Terapkan Tema Divisi dan Logo Sekolah
+        const divKey = (data.division || 'mumtaz').toLowerCase();
+        let themeClass = 'theme-mumtaz';
+        let logoSrc = '/images/logo.png';
+
+        if (divKey === 'sd') {
+          themeClass = 'theme-sd';
+          logoSrc = '/images/sd.png';
+        } else if (divKey === 'smp_sma') {
+          themeClass = 'theme-smp-sma';
+          logoSrc = '/images/nz.png';
+        } else {
+          themeClass = 'theme-mumtaz';
+          logoSrc = '/images/logo.png';
+        }
+
+        document.body.className = themeClass;
+        document.getElementById('invoice-school-logo').src = logoSrc;
+        document.getElementById('invoice-school-name').textContent = data.division_name || 'Sekolah Islam';
+        document.title = `Tagihan Pemesanan Buku #${data.order_code} - ${data.division_name}`;
+
+        // 2. Isi Identitas Pesanan
+        document.getElementById('invoice-order-code').textContent = data.order_code || '-';
+        document.getElementById('invoice-order-date').textContent = formatTanggalIndonesia(data.created_at);
+        document.getElementById('invoice-student-name').textContent = data.student_name || '-';
+        document.getElementById('invoice-student-class').textContent = `Kelas ${data.class_name || '-'}`;
+        document.getElementById('invoice-student-va').textContent = data.va_number || '-';
+        document.getElementById('invoice-parent-wa').textContent = data.parent_whatsapp || '-';
+        document.getElementById('invoice-parent-email').textContent = data.parent_email || '-';
+
+        // 3. Render Tabel Buku
+        const tbody = document.getElementById('invoice-books-tbody');
+        tbody.innerHTML = '';
+
+        const books = Array.isArray(data.books) ? data.books : [];
+        if (books.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 18px;">Tidak ada rincian buku.</td></tr>';
+        } else {
+          books.forEach((book, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
+              <td><strong>${escapeHtml(book.name)}</strong></td>
+              <td style="color: var(--text-muted);">${escapeHtml(book.publisher || data.division_name)}</td>
+              <td style="text-align: right; font-weight: 600;">${formatRupiah(book.price)}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        document.getElementById('invoice-total-amount').textContent = formatRupiah(data.total_price);
+
+        // 4. Area QRIS Pembayaran (Poster Resmi & Kode QR)
+        const qrisSection = document.getElementById('invoice-qris-section');
+        const noQrisSection = document.getElementById('invoice-no-qris-section');
+
+        if (data.qris_configured && (data.qris_image_url || data.poster_image_url)) {
+          qrisSection.style.display = 'block';
+          noQrisSection.style.display = 'none';
+
+          const merchantName = data.merchant_name || 'SEKOLAH ISLAM MUMTAZ';
+          document.getElementById('invoice-qris-merchant').textContent = merchantName;
+          document.getElementById('guide-merchant-name').textContent = merchantName;
+          document.getElementById('invoice-qris-locked-amount').textContent = formatRupiah(data.total_price);
+
+          const posterImgEl = document.getElementById('invoice-poster-image');
+          const qrisImgEl = document.getElementById('invoice-qris-image');
+          const posterDownloadBtn = document.getElementById('invoice-poster-download-btn');
+          const qrisDownloadBtn = document.getElementById('invoice-qris-download-btn');
+
+          // Pasang fallback sumber gambar awal
+          if (qrisImgEl) {
+            qrisImgEl.src = data.qris_data_url || (data.qris_image_url || '');
+          }
+          if (posterImgEl) {
+            posterImgEl.src = data.poster_image_url || (data.qris_data_url || data.qris_image_url || '');
+          }
+
+          // Atur tautan unduh kode QR saja
+          if (qrisDownloadBtn) {
+            const dlQrUrl = data.qris_image_url
+              ? (data.qris_image_url.includes('?') ? `${data.qris_image_url}&download=1` : `${data.qris_image_url}?download=1`)
+              : '#';
+            qrisDownloadBtn.href = dlQrUrl;
+            qrisDownloadBtn.setAttribute('download', `QRIS-Code-${data.order_code}.png`);
+          }
+
+          // Atur tautan unduh poster resmi
+          if (posterDownloadBtn) {
+            const dlPosterUrl = data.poster_image_url
+              ? (data.poster_image_url.includes('?') ? `${data.poster_image_url}&download=1` : `${data.poster_image_url}?download=1`)
+              : '#';
+            posterDownloadBtn.href = dlPosterUrl;
+            posterDownloadBtn.setAttribute('download', `Poster-QRIS-${data.order_code}.png`);
+          }
+
+          // Rendring instan canvas browser jika renderer tersedia
+          if (window.QRIS_RENDERER && data.qris_data_url) {
+            window.QRIS_RENDERER.renderQRISTemplate(null, data.qris_data_url).then(rendered => {
+              if (posterImgEl) posterImgEl.src = rendered.dataUrl;
+              if (posterDownloadBtn) {
+                posterDownloadBtn.onclick = (e) => {
+                  e.preventDefault();
+                  window.QRIS_RENDERER.downloadQRISImage(rendered.dataUrl, `Poster-QRIS-${data.order_code}.jpg`);
+                };
+              }
+            }).catch(e => {
+              console.warn('Canvas render fallback:', e);
+            });
+          }
+        } else {
+          qrisSection.style.display = 'none';
+          noQrisSection.style.display = 'flex';
+        }
+
+        // 5. Tombol WhatsApp Konfirmasi
+        const waAdmin = (data.wa_admin || '628999741234').replace(/[^0-9]/g, '');
+        const waText = `Assalamu'alaikum Warahmatullahi Wabarakatuh,
+
+Yth. Admin Pemesanan Buku ${data.division_name},
+Saya ingin mengonfirmasi pembayaran pemesanan buku:
+
+• Kode Pesanan : ${data.order_code}
+• Nama Siswa : ${data.student_name}
+• Kelas : Kelas ${data.class_name}
+• No. Virtual Account : ${data.va_number}
+• Total Tagihan : ${formatRupiah(data.total_price)}
+
+Berikut saya lampirkan bukti pembayaran yang telah saya lakukan. Mohon dapat diverifikasi dan diproses.
+
+Jazakumullahu Khairan Wabarakallahu Fiikum.`;
+
+        const waUrl = `https://wa.me/${waAdmin}?text=${encodeURIComponent(waText)}`;
+        document.getElementById('invoice-wa-btn').href = waUrl;
+
+        // Tampilkan konten tagihan
+        loadingEl.style.display = 'none';
+        contentEl.style.display = 'block';
+
+      } catch (err) {
+        console.error('Error memuat invoice:', err);
+        loadingEl.style.display = 'none';
+        errorMsgEl.textContent = err.message || 'Gagal memuat rincian tagihan.';
+        errorEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

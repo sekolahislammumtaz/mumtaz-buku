@@ -3,15 +3,92 @@ const path = require('path');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
 const { initDatabase, dbQuery, hashPassword } = require('./database');
+const { validateQRIS, parseQRISData, convertToDynamic } = require('./utils/qris');
+const { generateQRISPosterBuffer } = require('./utils/qris_poster');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'SiMumtazSecretJWTKeyForSchoolBookOrderApp123';
 
+// Metadata divisi (nama divisi, prefix ID pesanan, nomor WhatsApp Admin)
+const DIVISION_META = {
+  sd: {
+    key: 'sd',
+    name: 'SD Islam Nazhirah',
+    prefix: 'SD',
+    waAdmin: '628997711234'
+  },
+  smp_sma: {
+    key: 'smp_sma',
+    name: 'SMP & SMA Islam Nazhirah',
+    prefix: 'NZ',
+    waAdmin: '6289618600656'
+  },
+  mumtaz: {
+    key: 'mumtaz',
+    name: 'Sekolah Islam Mumtaz',
+    prefix: 'MUMTAZ',
+    waAdmin: '628999741234'
+  }
+};
+
+function getDivisionMeta(division) {
+  const key = (division || 'mumtaz').toLowerCase();
+  return DIVISION_META[key] || {
+    key: key,
+    name: 'Sekolah Islam Mumtaz',
+    prefix: key.toUpperCase(),
+    waAdmin: '628999741234'
+  };
+}
+
+// Helper token deterministik aman untuk halaman tagihan & gambar QRIS
+function generateOrderToken(orderId, vaNumber) {
+  const data = `${orderId}:${vaNumber || ''}`;
+  return crypto.createHmac('sha256', JWT_SECRET).update(data).digest('hex').substring(0, 16);
+}
+
+function verifyOrderToken(order, token) {
+  if (!order || !token || typeof token !== 'string') return false;
+  const expectedToken = generateOrderToken(order.id, order.va_number);
+  if (token.length !== expectedToken.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedToken));
+}
+
+// Helper membaca QRIS statis divisi dari settings
+async function getDivisionStaticQris(division) {
+  const divKey = (division || 'mumtaz').toLowerCase();
+  const settingKey = `qris_static_${divKey}`;
+  const row = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [settingKey]);
+  if (row && row.value && row.value.trim()) return row.value.trim();
+  if (divKey !== 'mumtaz') {
+    const fallback = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_mumtaz']);
+    if (fallback && fallback.value && fallback.value.trim()) return fallback.value.trim();
+  }
+  return null;
+}
+
+// Helper penyimpanan settings yang kompatibel untuk SQLite, LibSQL, dan Neon PostgreSQL
+async function saveSetting(key, value) {
+  const existing = await dbQuery.get('SELECT key FROM settings WHERE key = ?', [key]);
+  if (existing) {
+    await dbQuery.run('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+  } else {
+    await dbQuery.run('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);
+  }
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Layani file jsQR.js lokal untuk scanner admin
+app.get('/vendor/jsqr.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'jsqr', 'dist', 'jsQR.js'));
+});
 
 // Configure Multer for Excel file uploads in memory
 const upload = multer({
@@ -210,6 +287,7 @@ app.post('/api/orders', async (req, res) => {
     student_name,
     class_name,
     va_number,
+    parent_name,
     parent_whatsapp,
     parent_email,
     book_ids, // array of IDs
@@ -218,17 +296,25 @@ app.post('/api/orders', async (req, res) => {
 
   const orderDivision = division || 'mumtaz';
 
-  if (!student_name || !class_name || !va_number || !parent_whatsapp || !parent_email || !book_ids || book_ids.length === 0) {
+  if (!student_name || !class_name || !va_number || !parent_whatsapp || !parent_email || !book_ids || !Array.isArray(book_ids) || book_ids.length === 0) {
     return res.status(400).json({ message: 'Mohon lengkapi seluruh data dan pilih minimal satu buku.' });
   }
 
   try {
-    // 1. Fetch details of chosen books to freeze them in the order
-    const placeholders = book_ids.map(() => '?').join(',');
-    const books = await dbQuery.all(`SELECT id, name, publisher, price FROM books WHERE id IN (${placeholders})`, book_ids);
+    const uniqueBookIds = [...new Set(book_ids.map(id => Number(id)).filter(id => !isNaN(id) && id > 0))];
+    if (uniqueBookIds.length === 0) {
+      return res.status(400).json({ message: 'Daftar ID buku yang dipilih tidak valid.' });
+    }
 
-    if (!books || books.length === 0) {
-      return res.status(400).json({ message: 'Buku yang dipilih tidak valid.' });
+    // 1. Fetch details of chosen books, ensuring matching division and complete ID match
+    const placeholders = uniqueBookIds.map(() => '?').join(',');
+    const books = await dbQuery.all(
+      `SELECT id, name, publisher, price FROM books WHERE division = ? AND id IN (${placeholders})`,
+      [orderDivision, ...uniqueBookIds]
+    );
+
+    if (!books || books.length !== uniqueBookIds.length) {
+      return res.status(400).json({ message: 'Buku yang dipilih tidak valid atau tidak cocok dengan divisi yang dipilih.' });
     }
 
     // 2. Anti-duplicate validation: check if student has already ordered any of these books in this division
@@ -259,17 +345,55 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
+    // 3. Re-calculate verified total price on the server
+    const verifiedTotalPrice = books.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
     const bookDetailsJson = JSON.stringify(books);
     const createdAt = new Date().toISOString();
 
     const result = await dbQuery.run(`
       INSERT INTO orders (division, student_name, class_name, va_number, parent_name, parent_whatsapp, parent_email, book_details, total_price, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [orderDivision, student_name, class_name, va_number, '', parent_whatsapp, parent_email, bookDetailsJson, total_price, createdAt]);
+    `, [orderDivision, student_name, class_name, va_number, parent_name || '', parent_whatsapp, parent_email, bookDetailsJson, verifiedTotalPrice, createdAt]);
+
+    const orderId = result.lastID;
+    const invoiceToken = generateOrderToken(orderId, va_number);
+    const divMeta = getDivisionMeta(orderDivision);
+    const orderCode = `${divMeta.prefix}-${String(orderId).padStart(4, '0')}`;
+
+    let qrisConfigured = false;
+    let qrisDataUrl = null;
+    let dynamicQrisString = null;
+    let merchantName = null;
+
+    const staticQris = await getDivisionStaticQris(orderDivision);
+    if (staticQris && verifiedTotalPrice > 0) {
+      const qrisVal = validateQRIS(staticQris);
+      if (qrisVal.valid) {
+        try {
+          const dynamicResult = convertToDynamic(staticQris, { amount: verifiedTotalPrice });
+          merchantName = dynamicResult.merchantName;
+          dynamicQrisString = dynamicResult.dynamicQris;
+          qrisDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 420, margin: 2 });
+          qrisConfigured = true;
+        } catch (err) {
+          console.error('Gagal generate QRIS dinamis untuk order:', err);
+        }
+      }
+    }
 
     res.status(201).json({
       message: 'Pesanan berhasil disimpan.',
-      order_id: result.lastID
+      order_id: orderId,
+      order_code: orderCode,
+      invoice_token: invoiceToken,
+      total_price: verifiedTotalPrice,
+      qris_configured: qrisConfigured,
+      qris_data_url: qrisDataUrl,
+      dynamic_qris: dynamicQrisString,
+      merchant_name: merchantName,
+      invoice_url: `/tagihan.html?id=${orderId}&t=${invoiceToken}`,
+      qris_image_url: qrisConfigured ? `/api/orders/${orderId}/qris.png?t=${invoiceToken}` : null,
+      poster_image_url: qrisConfigured ? `/api/orders/${orderId}/poster.png?t=${invoiceToken}` : null
     });
   } catch (error) {
     console.error(error);
@@ -687,6 +811,137 @@ app.post('/api/admin/students/import', authenticateAdmin, upload.single('file'),
 
 
 // ----------------------------------------------------
+// ADMIN QRIS SETTINGS API
+// ----------------------------------------------------
+
+// GET static QRIS setting for logged-in admin division
+app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
+  const division = req.admin.division || 'mumtaz';
+  try {
+    const staticQris = await getDivisionStaticQris(division);
+    if (!staticQris) {
+      return res.json({
+        configured: false,
+        division,
+        qris_string: null,
+        merchant_name: null,
+        merchant_city: null,
+        valid: false
+      });
+    }
+
+    const val = validateQRIS(staticQris);
+    res.json({
+      configured: true,
+      division,
+      qris_string: staticQris,
+      merchant_name: val.valid ? val.data.merchantName : null,
+      merchant_city: val.valid ? val.data.merchantCity : null,
+      valid: val.valid,
+      errors: val.errors
+    });
+  } catch (error) {
+    console.error('Error fetching admin QRIS:', error);
+    res.status(500).json({ message: 'Gagal mengambil konfigurasi QRIS.' });
+  }
+});
+
+// POST save static QRIS for logged-in admin division (or apply to all divisions)
+app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
+  const division = req.admin.division || 'mumtaz';
+  const { qris_string, apply_all } = req.body;
+
+  if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
+    return res.status(400).json({ message: 'String QRIS wajib diisi.' });
+  }
+
+  const cleanQris = qris_string.trim();
+  const val = validateQRIS(cleanQris);
+  if (!val.valid) {
+    return res.status(400).json({
+      message: 'String QRIS tidak valid. Pastikan format EMVCo dan checksum CRC16 benar.',
+      errors: val.errors
+    });
+  }
+
+  try {
+    if (apply_all === true || apply_all === 'true') {
+      await saveSetting('qris_static_sd', cleanQris);
+      await saveSetting('qris_static_smp_sma', cleanQris);
+      await saveSetting('qris_static_mumtaz', cleanQris);
+      return res.json({
+        message: 'QRIS statis berhasil disimpan untuk seluruh divisi (SD, SMP-SMA, Mumtaz).',
+        merchant_name: val.data.merchantName,
+        merchant_city: val.data.merchantCity,
+        applied_to: ['sd', 'smp_sma', 'mumtaz']
+      });
+    } else {
+      await saveSetting(`qris_static_${division}`, cleanQris);
+      return res.json({
+        message: `QRIS statis berhasil disimpan untuk divisi ${division}.`,
+        merchant_name: val.data.merchantName,
+        merchant_city: val.data.merchantCity,
+        applied_to: [division]
+      });
+    }
+  } catch (error) {
+    console.error('Error saving static QRIS:', error);
+    res.status(500).json({ message: 'Gagal menyimpan konfigurasi QRIS ke database.' });
+  }
+});
+
+// DELETE static QRIS setting for logged-in admin division
+app.delete('/api/admin/qris', authenticateAdmin, async (req, res) => {
+  const division = req.admin.division || 'mumtaz';
+  try {
+    await dbQuery.run('DELETE FROM settings WHERE key = ?', [`qris_static_${division}`]);
+    res.json({ message: `QRIS statis untuk divisi ${division} berhasil dihapus.` });
+  } catch (error) {
+    console.error('Error deleting QRIS:', error);
+    res.status(500).json({ message: 'Gagal menghapus konfigurasi QRIS.' });
+  }
+});
+
+// POST preview dynamic QRIS (admin simulation test)
+app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
+  const { qris_string, amount } = req.body;
+
+  if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
+    return res.status(400).json({ message: 'String QRIS wajib diisi.' });
+  }
+
+  const cleanQris = qris_string.trim();
+  const val = validateQRIS(cleanQris);
+  if (!val.valid) {
+    return res.status(400).json({
+      message: 'String QRIS tidak valid.',
+      errors: val.errors
+    });
+  }
+
+  const testAmount = amount ? Number(amount) : 10000;
+  if (isNaN(testAmount) || testAmount <= 0) {
+    return res.status(400).json({ message: 'Nominal simulasi harus berupa angka positif.' });
+  }
+
+  try {
+    const dynamicResult = convertToDynamic(cleanQris, { amount: testAmount });
+    const previewDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 400, margin: 2 });
+
+    res.json({
+      dynamic_qris: dynamicResult.dynamicQris,
+      merchant_name: dynamicResult.merchantName,
+      merchant_city: dynamicResult.merchantCity,
+      amount: dynamicResult.amount,
+      preview_url: previewDataUrl
+    });
+  } catch (error) {
+    console.error('Error previewing dynamic QRIS:', error);
+    res.status(500).json({ message: 'Gagal membuat preview QRIS dinamis: ' + error.message });
+  }
+});
+
+// ----------------------------------------------------
 // ADMIN ORDERS & EXPORT API
 // ----------------------------------------------------
 
@@ -695,13 +950,24 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
   try {
     const orders = await dbQuery.all('SELECT * FROM orders WHERE division = ? ORDER BY id DESC', [division]);
-    // Parse book_details JSON string for client convenience
+    const staticQris = await getDivisionStaticQris(division);
+    const qrisConfigured = !!staticQris;
+    const divMeta = getDivisionMeta(division);
+
+    // Parse book_details JSON string for client convenience and inject secure tokens
     const formattedOrders = orders.map(order => {
       try {
         order.book_details = JSON.parse(order.book_details);
       } catch (e) {
         order.book_details = [];
       }
+      const token = generateOrderToken(order.id, order.va_number);
+      order.order_code = `${divMeta.prefix}-${String(order.id).padStart(4, '0')}`;
+      order.invoice_token = token;
+      order.invoice_path = `/tagihan.html?id=${order.id}&t=${token}`;
+      order.qris_image_path = `/api/orders/${order.id}/qris.png?t=${token}`;
+      order.poster_image_path = `/api/orders/${order.id}/poster.png?t=${token}`;
+      order.qris_configured = qrisConfigured;
       return order;
     });
     res.json(formattedOrders);
@@ -1034,6 +1300,190 @@ app.get('/api/admin/orders/export-recap', authenticateAdmin, async (req, res) =>
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Gagal mengekspor rekap per kelas.' });
+  }
+});
+
+// ----------------------------------------------------
+// PUBLIC ORDER INVOICE & QRIS IMAGE ENDPOINTS
+// ----------------------------------------------------
+
+// GET public order invoice detail (requires valid invoice token)
+app.get('/api/orders/:id/invoice', async (req, res) => {
+  const { id } = req.params;
+  const token = req.query.t;
+
+  if (!token) {
+    return res.status(403).json({ message: 'Akses ditolak: token invoice diperlukan.' });
+  }
+
+  try {
+    const order = await dbQuery.get('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      return res.status(404).json({ message: 'Pesanan tidak ditemukan.' });
+    }
+
+    if (!verifyOrderToken(order, token)) {
+      return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
+    }
+
+    let books = [];
+    try {
+      books = typeof order.book_details === 'string' ? JSON.parse(order.book_details) : (order.book_details || []);
+    } catch (e) {
+      books = [];
+    }
+
+    const divMeta = getDivisionMeta(order.division);
+    const orderCode = `${divMeta.prefix}-${String(order.id).padStart(4, '0')}`;
+    const staticQris = await getDivisionStaticQris(order.division);
+
+    let qrisConfigured = false;
+    let merchantName = null;
+    let qrisDataUrl = null;
+    let dynamicQrisString = null;
+
+    if (staticQris && Number(order.total_price) > 0) {
+      const qrisVal = validateQRIS(staticQris);
+      if (qrisVal.valid) {
+        try {
+          const dynamicResult = convertToDynamic(staticQris, { amount: Number(order.total_price) });
+          qrisConfigured = true;
+          merchantName = dynamicResult.merchantName;
+          dynamicQrisString = dynamicResult.dynamicQris;
+          qrisDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 420, margin: 2 });
+        } catch (err) {
+          console.error('Error generating dynamic QRIS for invoice:', err);
+        }
+      }
+    }
+
+    res.json({
+      id: order.id,
+      order_code: orderCode,
+      division: order.division,
+      division_name: divMeta.name,
+      wa_admin: divMeta.waAdmin,
+      student_name: order.student_name,
+      class_name: order.class_name,
+      va_number: order.va_number,
+      parent_name: order.parent_name,
+      parent_whatsapp: order.parent_whatsapp,
+      parent_email: order.parent_email,
+      total_price: Number(order.total_price),
+      created_at: order.created_at,
+      books: books,
+      qris_configured: qrisConfigured,
+      merchant_name: merchantName,
+      qris_data_url: qrisDataUrl,
+      dynamic_qris: dynamicQrisString,
+      qris_image_url: qrisConfigured ? `/api/orders/${order.id}/qris.png?t=${token}` : null,
+      poster_image_url: qrisConfigured ? `/api/orders/${order.id}/poster.png?t=${token}` : null
+    });
+  } catch (error) {
+    console.error('Error fetching order invoice:', error);
+    res.status(500).json({ message: 'Gagal mengambil data tagihan pesanan.' });
+  }
+});
+
+// GET dynamic QRIS PNG image (requires valid invoice token)
+app.get('/api/orders/:id/qris.png', async (req, res) => {
+  const { id } = req.params;
+  const token = req.query.t;
+
+  if (!token) {
+    return res.status(403).json({ message: 'Akses ditolak: token invoice diperlukan.' });
+  }
+
+  try {
+    const order = await dbQuery.get('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      return res.status(404).json({ message: 'Pesanan tidak ditemukan.' });
+    }
+
+    if (!verifyOrderToken(order, token)) {
+      return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
+    }
+
+    const staticQris = await getDivisionStaticQris(order.division);
+    if (!staticQris) {
+      return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
+    }
+
+    const amount = Number(order.total_price);
+    if (amount <= 0) {
+      return res.status(400).json({ message: 'Total tagihan Rp 0, QRIS tidak diperlukan.' });
+    }
+
+    const dynamicResult = convertToDynamic(staticQris, { amount });
+    const pngBuffer = await QRCode.toBuffer(dynamicResult.dynamicQris, {
+      type: 'png',
+      width: 480,
+      margin: 2
+    });
+
+    const divMeta = getDivisionMeta(order.division);
+    const filename = `QRIS-${divMeta.prefix}-${String(order.id).padStart(4, '0')}.png`;
+
+    res.setHeader('Content-Type', 'image/png');
+    if (req.query.download === '1' || req.query.download === 'true') {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    } else {
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    }
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(pngBuffer);
+  } catch (error) {
+    console.error('Error generating dynamic QRIS image:', error);
+    res.status(500).json({ message: 'Gagal menghasilkan gambar QRIS: ' + error.message });
+  }
+});
+
+// GET dynamic QRIS official poster image (PNG format, requires valid invoice token)
+app.get('/api/orders/:id/poster.png', async (req, res) => {
+  const { id } = req.params;
+  const token = req.query.t;
+
+  if (!token) {
+    return res.status(403).json({ message: 'Akses ditolak: token invoice diperlukan.' });
+  }
+
+  try {
+    const order = await dbQuery.get('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      return res.status(404).json({ message: 'Pesanan tidak ditemukan.' });
+    }
+
+    if (!verifyOrderToken(order, token)) {
+      return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
+    }
+
+    const staticQris = await getDivisionStaticQris(order.division);
+    if (!staticQris) {
+      return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
+    }
+
+    const amount = Number(order.total_price);
+    if (amount <= 0) {
+      return res.status(400).json({ message: 'Total tagihan Rp 0, QRIS tidak diperlukan.' });
+    }
+
+    const dynamicResult = convertToDynamic(staticQris, { amount });
+    const posterBuffer = await generateQRISPosterBuffer(dynamicResult.dynamicQris);
+
+    const divMeta = getDivisionMeta(order.division);
+    const filename = `Poster-QRIS-${divMeta.prefix}-${String(order.id).padStart(4, '0')}.png`;
+
+    res.setHeader('Content-Type', 'image/png');
+    if (req.query.download === '1' || req.query.download === 'true') {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    } else {
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    }
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(posterBuffer);
+  } catch (error) {
+    console.error('Error generating dynamic QRIS poster:', error);
+    res.status(500).json({ message: 'Gagal menghasilkan poster QRIS: ' + error.message });
   }
 });
 

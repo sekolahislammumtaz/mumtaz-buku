@@ -94,6 +94,9 @@
         <button id="tab-students-btn" class="tab-btn" onclick="switchTab('students')">
           <i class="fa-solid fa-users"></i> Kelola Data Siswa
         </button>
+        <button id="tab-qris-btn" class="tab-btn" onclick="switchTab('qris')">
+          <i class="fa-solid fa-qrcode"></i> Pengaturan QRIS
+        </button>
       </div>
 
       <!-- ========================================== -->
@@ -381,6 +384,130 @@
         </div>
       </div>
 
+      <!-- ========================================== -->
+      <!-- TAB 4: QRIS SETTINGS -->
+      <!-- ========================================== -->
+      <div id="tab-qris" class="tab-content">
+        <div class="qris-grid-layout">
+          
+          <!-- Kartu 1: Konfigurasi QRIS Statis Bank BSI -->
+          <div class="admin-card">
+            <div class="card-header-flex" style="border-bottom: 2px solid #F1F5F9; padding-bottom: 14px; margin-bottom: 20px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <h2 style="color: var(--primary-navy); font-weight: 800; font-size: 1.3rem; margin: 0;">
+                    <i class="fa-solid fa-qrcode" style="color: var(--primary-navy);"></i> Konfigurasi QRIS Statis Bank BSI
+                  </h2>
+                  <span id="qris-status-badge" class="qris-status-pill unconfigured">
+                    <i class="fa-solid fa-circle-exclamation"></i> Belum Diatur
+                  </span>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">
+                  Konfigurasi kode QRIS statis Bank Syariah Indonesia (BSI) untuk divisi <strong id="qris-active-division-label" style="color: var(--primary-navy);">Sekolah Islam Mumtaz</strong>.
+                </p>
+              </div>
+            </div>
+
+            <!-- Info Merchant Terdeteksi -->
+            <div id="qris-merchant-display" class="qris-merchant-info">
+              <i class="fa-solid fa-store"></i>
+              <span>Belum ada konfigurasi QRIS yang disimpan untuk divisi ini.</span>
+            </div>
+
+            <form id="qris-form" onsubmit="handleSaveQris(event)" style="margin-top: 20px;">
+              <!-- Unggah Gambar QRIS Statis -->
+              <div class="form-group">
+                <label for="qris-image-file" style="font-weight: 700; color: var(--primary-navy); display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-file-image"></i> Unggah File Gambar / Poster QRIS Statis
+                </label>
+                <div class="qris-upload-zone">
+                  <input type="file" id="qris-image-file" accept="image/png, image/jpeg, image/webp" onchange="handleQrisImageUpload(event)" class="form-control" style="background: #FFF; padding: 10px;">
+                  <p class="qris-upload-hint">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Gambar QRIS akan dipindai dan didekode secara otomatis oleh peramban menggunakan pustaka jsQR. Admin tidak perlu mengekstrak atau menyalin teks secara manual.
+                  </p>
+                </div>
+                <canvas id="qris-decode-canvas" style="display: none;"></canvas>
+              </div>
+
+              <!-- String Payload QRIS Mentah -->
+              <div class="form-group" style="margin-top: 16px;">
+                <label for="qris-string-input" style="font-weight: 700; color: var(--primary-navy); display: flex; justify-content: space-between; align-items: center;">
+                  <span><i class="fa-solid fa-code"></i> String Payload QRIS Mentah (EMVCo)</span>
+                  <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Format: 000201...</span>
+                </label>
+                <textarea id="qris-string-input" class="form-control" rows="4" placeholder="Hasil pemindaian gambar QRIS akan tampil di sini, atau Anda dapat menempel string 000201... secara manual..." style="font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; word-break: break-all; resize: vertical;"></textarea>
+                <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 4px;">
+                  Memuat data merchant Bank BSI (Tag 26/51), Point of Initiation (Tag 01), serta CRC16 checksum (Tag 63).
+                </small>
+              </div>
+
+              <!-- Checkbox Opsi Terapkan ke Seluruh Divisi -->
+              <div class="form-group" style="margin-top: 16px; background-color: #F8FAFC; padding: 12px 14px; border-radius: var(--border-radius-sm); border: 1px solid #E2E8F0;">
+                <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin: 0;">
+                  <input type="checkbox" id="qris-apply-all" style="width: 18px; height: 18px; margin-top: 2px; cursor: pointer; accent-color: var(--primary-navy);">
+                  <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-dark);">
+                    Terapkan QRIS statis ini ke seluruh divisi (SD, SMP-SMA, dan Mumtaz)
+                    <small style="display: block; color: var(--text-muted); font-weight: normal; margin-top: 2px;">
+                      Centang opsi ini jika seluruh jenjang sekolah menggunakan satu rekening Bank BSI / merchant QRIS yang sama.
+                    </small>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Tombol Aksi -->
+              <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 24px;">
+                <button type="submit" class="btn-action-primary" style="padding: 10px 22px;">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan QRIS
+                </button>
+                <button type="button" onclick="handleDeleteQris()" class="btn-logout" style="border-color: #EF4444; color: #EF4444; padding: 10px 18px;" title="Hapus QRIS Divisi Ini">
+                  <i class="fa-solid fa-trash"></i> Hapus QRIS Divisi Ini
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Kartu 2: Simulasi Uji Coba QRIS Dinamis -->
+          <div class="admin-card">
+            <div class="card-header-flex" style="border-bottom: 2px solid #F1F5F9; padding-bottom: 14px; margin-bottom: 20px;">
+              <div>
+                <h2 style="color: var(--primary-navy); font-weight: 800; font-size: 1.3rem; margin: 0;">
+                  <i class="fa-solid fa-vial-circle-check" style="color: #10B981;"></i> Simulasi Uji Coba QRIS Dinamis
+                </h2>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">
+                  Uji coba pembentukan QRIS dinamis dengan nominal tagihan otomatis sebelum disebarkan ke wali murid.
+                </p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="qris-test-amount" style="font-weight: 700; color: var(--primary-navy);">
+                Nominal Tagihan Percobaan (Rp)
+              </label>
+              <div style="display: flex; gap: 10px; margin-top: 6px;">
+                <input type="number" id="qris-test-amount" class="form-control" value="10000" min="1000" step="1000" placeholder="10000" style="font-weight: 700; font-size: 1rem;">
+                <button type="button" onclick="handlePreviewQris()" class="btn-action-accent" style="white-space: nowrap; padding: 10px 18px; font-weight: 700;">
+                  <i class="fa-solid fa-qrcode"></i> Buat Preview QRIS
+                </button>
+              </div>
+              <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 4px;">
+                Default uji coba: Rp 10.000. Sistem akan menyuntikkan nominal (Tag 54) & mengubah mode ke Dinamis (Tag 01).
+              </small>
+            </div>
+
+            <!-- Area Hasil Preview -->
+            <div id="qris-preview-box" class="qris-preview-box" style="margin-top: 20px;">
+              <div class="qris-preview-placeholder">
+                <i class="fa-solid fa-qrcode" style="font-size: 3rem; color: #CBD5E1; margin-bottom: 12px; display: block;"></i>
+                <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">
+                  Unggah atau simpan string QRIS, lalu klik <strong>"Buat Preview QRIS"</strong> untuk melihat tampilan QR dinamis di sini.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -546,7 +673,9 @@
     </div>
   </div>
 
-  <!-- App Admin script -->
+  <!-- Vendor & App Admin script -->
+  <script src="/vendor/jsqr.js"></script>
+  <script src="/js/qris-renderer.js"></script>
   <script src="/js/admin.js"></script>
 </body>
 </html>

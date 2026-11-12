@@ -590,16 +590,96 @@ async function handleFormSubmit(event) {
       throw new Error(err.message || 'Gagal menyimpan pesanan.');
     }
 
-    // Detail buku terpilih untuk format pesan WA
+    const resData = await response.json();
+
+    // 1. Tampilkan data identitas pesanan pada Modal Sukses
+    const orderCodeBadge = document.getElementById('order-code-badge');
+    if (orderCodeBadge) {
+      orderCodeBadge.textContent = resData.order_code || '-';
+    }
+
+    const modalTotalAmount = document.getElementById('modal-total-amount');
+    if (modalTotalAmount) {
+      modalTotalAmount.textContent = formatRupiah(resData.total_price || totalPrice);
+    }
+
+    // 2. Konfigurasi tampilan QRIS Poster Resmi atau Catatan Cadangan
+    const qrisSection = document.getElementById('modal-qris-section');
+    const noQrisNote = document.getElementById('modal-no-qris-note');
+    const qrisImg = document.getElementById('modal-qris-image');
+    const qrisMerchant = document.getElementById('modal-qris-merchant');
+    const qrisPosterDownloadBtn = document.getElementById('modal-qris-download-poster');
+    const qrisDownloadBtn = document.getElementById('modal-qris-download');
+    const invoiceLink = document.getElementById('modal-invoice-link');
+
+    if (resData.qris_configured) {
+      if (qrisSection) qrisSection.style.display = 'block';
+      if (noQrisNote) noQrisNote.style.display = 'none';
+
+      if (qrisMerchant) {
+        qrisMerchant.textContent = resData.merchant_name || 'SEKOLAH ISLAM MUMTAZ';
+      }
+
+      // Default URL poster dari backend
+      const posterDownloadUrl = resData.poster_image_url
+        ? (resData.poster_image_url.includes('?') ? `${resData.poster_image_url}&download=1` : `${resData.poster_image_url}?download=1`)
+        : '#';
+
+      if (qrisPosterDownloadBtn) {
+        qrisPosterDownloadBtn.href = posterDownloadUrl;
+        qrisPosterDownloadBtn.setAttribute('download', `Poster-QRIS-${resData.order_code || 'Mumtaz'}.png`);
+      }
+
+      // Rendring instan menggunakan canvas client-side jika renderer siap
+      if (window.QRIS_RENDERER && resData.qris_data_url) {
+        window.QRIS_RENDERER.renderQRISTemplate(null, resData.qris_data_url).then(rendered => {
+          if (qrisImg) qrisImg.src = rendered.dataUrl;
+          if (qrisPosterDownloadBtn) {
+            qrisPosterDownloadBtn.onclick = (e) => {
+              e.preventDefault();
+              window.QRIS_RENDERER.downloadQRISImage(rendered.dataUrl, `Poster-QRIS-${resData.order_code || 'Mumtaz'}.jpg`);
+            };
+          }
+        }).catch(err => {
+          console.warn('Canvas render fallback to backend poster image:', err);
+          if (qrisImg) {
+            qrisImg.src = resData.poster_image_url || (resData.qris_data_url || resData.qris_image_url || '');
+          }
+        });
+      } else if (qrisImg) {
+        qrisImg.src = resData.poster_image_url || (resData.qris_data_url || resData.qris_image_url || '');
+      }
+
+      if (qrisDownloadBtn) {
+        const downloadUrl = resData.qris_image_url
+          ? (resData.qris_image_url.includes('?') ? `${resData.qris_image_url}&download=1` : `${resData.qris_image_url}?download=1`)
+          : '#';
+        qrisDownloadBtn.href = downloadUrl;
+        qrisDownloadBtn.setAttribute('download', `QRIS-Code-${resData.order_code || 'Pesanan'}.png`);
+      }
+
+      if (invoiceLink) {
+        invoiceLink.href = resData.invoice_url || '#';
+      }
+    } else {
+      if (qrisSection) qrisSection.style.display = 'none';
+      if (noQrisNote) noQrisNote.style.display = 'block';
+    }
+
+    // 3. Detail buku terpilih untuk format pesan WA
     const selectedBooks = loadedBooks.filter(b => selectedBookIds.has(b.id));
     const booksListText = selectedBooks.map(b => `• ${b.name} (${formatRupiah(b.price)})`).join('\n');
 
-    // Format Pesan WhatsApp Terstruktur & Formal Islami
+    // Link tagihan lengkap
+    const invoiceFullUrl = `${window.location.origin}${resData.invoice_url || ''}`;
+
+    // 4. Format Pesan WhatsApp Terstruktur & Formal Islami
     const waText = `Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
 Yth. Admin Pemesanan Buku ${CONFIG.divisionName},
 Berikut rincian pemesanan buku siswa:
 
+• Kode Pesanan : ${resData.order_code}
 • Nama Siswa : ${studentName}
 • Kelas : Kelas ${className}
 • No. Virtual Account : ${vaNumber}
@@ -609,38 +689,43 @@ Berikut rincian pemesanan buku siswa:
 Daftar Buku yang Dipesan:
 ${booksListText}
 
-Total Pembayaran: ${formatRupiah(totalPrice)}
+Total Pembayaran: ${formatRupiah(resData.total_price || totalPrice)}
+Link Tagihan & QRIS: ${invoiceFullUrl}
 
 Mohon konfirmasi dan petunjuk selanjutnya.
 Jazakumullahu Khairan Wabarakallahu Fiikum.`;
 
-    const cleanWaTarget = CONFIG.waTarget.replace(/[^0-9]/g, '');
+    const cleanWaTarget = (CONFIG.waTarget || '').replace(/[^0-9]/g, '');
     const waUrl = `https://wa.me/${cleanWaTarget}?text=${encodeURIComponent(waText)}`;
 
     // Set tautan tombol WhatsApp di modal
-    whatsappBtn.href = waUrl;
+    if (whatsappBtn) {
+      whatsappBtn.href = waUrl;
+      whatsappBtn.onclick = () => {
+        // Biarkan modal tetap ada saat membuka tab WA baru, atau user dapat menutupnya sendiri
+      };
+    }
 
-    // Reset Form
+    // Pasang tombol Tutup modal sukses
+    const closeSuccessBtn = document.getElementById('btn-close-success-modal');
+    if (closeSuccessBtn) {
+      closeSuccessBtn.onclick = () => {
+        if (successModal) successModal.classList.remove('show');
+      };
+    }
+
+    // 5. Reset Form
     document.getElementById('booking-form').reset();
     booksSection.style.display = 'none';
     selectedBookIds.clear();
     currentStudentOrderedBooks = [];
     calculateTotal();
 
-    // Tampilkan Modal Sukses
-    successModal.classList.add('show');
-
-    // Upayakan auto redirect ke WhatsApp
-    const waWindow = window.open(waUrl, '_blank');
-    if (!waWindow || waWindow.closed || typeof waWindow.closed === 'undefined') {
-      showToast('Pesanan berhasil disimpan.', 'success');
-    } else {
-      showToast('Pesanan tersimpan, membuka WhatsApp...', 'success');
+    // 6. Tampilkan Modal Sukses (tanpa auto window.open agar orang tua leluasa melihat & download QRIS)
+    if (successModal) {
+      successModal.classList.add('show');
     }
-
-    whatsappBtn.onclick = () => {
-      successModal.classList.remove('show');
-    };
+    showToast('Pesanan berhasil disimpan.', 'success');
 
   } catch (error) {
     console.error('Error saat menyimpan pesanan:', error);

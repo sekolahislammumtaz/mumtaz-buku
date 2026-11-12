@@ -107,19 +107,78 @@
     </div>
   </div>
 
-  <!-- Success Confirmation Modal -->
+  <!-- Success Confirmation Modal with QRIS -->
   <div id="success-modal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-icon" style="background: rgba(37, 211, 102, 0.1); width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #25D366; font-size: 2rem;">
-        <i class="fa-brands fa-whatsapp"></i>
+    <div class="modal-content modal-success-content">
+      <div class="modal-icon-success">
+        <i class="fa-solid fa-circle-check"></i>
       </div>
-      <h3 class="modal-title" style="color: var(--primary-navy); font-size: 1.35rem; font-weight: 800; margin-bottom: 8px;">Pesanan Berhasil Disimpan</h3>
-      <p class="modal-desc" style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">
-        Pemesanan buku untuk <strong>Sekolah Islam Mumtaz</strong> telah kami terima. Silakan lanjutkan konfirmasi ke WhatsApp admin sekolah untuk penyelesaian proses pemesanan.
+      <h3 class="modal-title">Pesanan Berhasil Disimpan</h3>
+      <p class="modal-desc" id="modal-success-desc">
+        Pemesanan buku untuk <strong>Sekolah Islam Mumtaz</strong> telah kami terima.
       </p>
-      <a href="#" id="whatsapp-btn" target="_blank" class="btn-whatsapp-redirect" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; background: #25D366; color: #FFF; font-weight: 700; border-radius: var(--border-radius-sm); text-decoration: none; font-size: 1rem; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);">
-        <i class="fa-brands fa-whatsapp" style="font-size: 1.25rem;"></i> Konfirmasi via WhatsApp
-      </a>
+
+      <!-- Ringkasan Kode Pesanan & Total -->
+      <div class="modal-order-summary">
+        <div class="order-summary-row">
+          <span class="order-summary-label">Kode Pesanan</span>
+          <span id="order-code-badge" class="badge-order-code">-</span>
+        </div>
+        <div class="order-summary-row">
+          <span class="order-summary-label">Total Pembayaran</span>
+          <span id="modal-total-amount" class="order-summary-total">Rp 0</span>
+        </div>
+      </div>
+
+      <!-- Area QRIS Pembayaran (Dinamis) -->
+      <div id="modal-qris-section" class="modal-qris-section">
+        <div class="qris-card-header">
+          <div class="qris-brand-title">
+            <i class="fa-solid fa-qrcode"></i> Poster QRIS Resmi Bank BSI
+          </div>
+          <div id="modal-qris-merchant" class="qris-merchant-badge">SEKOLAH ISLAM MUMTAZ</div>
+        </div>
+
+        <div class="modal-qris-box">
+          <div class="modal-qris-poster-wrap">
+            <img id="modal-qris-image" src="" alt="Poster QRIS Resmi Bank BSI" class="modal-qris-poster-img">
+          </div>
+        </div>
+
+        <p class="modal-qris-note">
+          <i class="fa-solid fa-shield-halved"></i> Nominal tagihan sudah otomatis terkunci di dalam kode QRIS. Bebas biaya admin &amp; dapat dipindai langsung dari layar atau unduh poster untuk scan via galeri BSI Mobile / m-banking lainnya.
+        </p>
+
+        <div class="modal-qris-actions" style="flex-direction: column; gap: 8px;">
+          <a href="#" id="modal-qris-download-poster" class="btn-download-poster-primary" download="Poster-QRIS.png">
+            <i class="fa-solid fa-file-arrow-down"></i> Unduh Poster QRIS Resmi (PNG)
+          </a>
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <a href="#" id="modal-qris-download" class="btn-download-qris-secondary" download="QRIS-Code.png" style="flex: 1;">
+              <i class="fa-solid fa-qrcode"></i> Unduh QR Saja
+            </a>
+            <a href="#" id="modal-invoice-link" target="_blank" class="btn-invoice-link" style="flex: 1;">
+              <i class="fa-solid fa-file-invoice"></i> Halaman Tagihan
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Keterangan jika QRIS belum disetting -->
+      <div id="modal-no-qris-note" class="modal-no-qris-note" style="display: none;">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>Metode pembayaran QRIS sedang disiapkan. Silakan klik tombol konfirmasi WhatsApp di bawah untuk mendapatkan instruksi pembayaran resmi dari Admin sekolah.</span>
+      </div>
+
+      <!-- Tombol Aksi WhatsApp & Tutup -->
+      <div class="modal-action-buttons">
+        <a href="#" id="whatsapp-btn" target="_blank" class="btn-whatsapp-redirect">
+          <i class="fa-brands fa-whatsapp"></i> Konfirmasi ke WhatsApp Admin
+        </a>
+        <button type="button" id="btn-close-success-modal" class="btn-close-modal">
+          <i class="fa-solid fa-xmark"></i> Tutup
+        </button>
+      </div>
     </div>
   </div>
 
@@ -160,7 +219,8 @@
     </div>
   </div>
 
-  <!-- Modular Order script -->
+  <!-- QRIS Renderer & Modular Order script -->
+  <script src="/js/qris-renderer.js"></script>
   <script src="/js/order.js"></script>
 </body>
 </html>
