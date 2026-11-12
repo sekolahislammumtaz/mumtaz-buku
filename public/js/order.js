@@ -609,7 +609,6 @@ async function handleFormSubmit(event) {
     const qrisImg = document.getElementById('modal-qris-image');
     const qrisMerchant = document.getElementById('modal-qris-merchant');
     const qrisPosterDownloadBtn = document.getElementById('modal-qris-download-poster');
-    const qrisDownloadBtn = document.getElementById('modal-qris-download');
     const invoiceLink = document.getElementById('modal-invoice-link');
 
     if (resData.qris_configured) {
@@ -648,14 +647,6 @@ async function handleFormSubmit(event) {
         });
       } else if (qrisImg) {
         qrisImg.src = resData.poster_image_url || (resData.qris_data_url || resData.qris_image_url || '');
-      }
-
-      if (qrisDownloadBtn) {
-        const downloadUrl = resData.qris_image_url
-          ? (resData.qris_image_url.includes('?') ? `${resData.qris_image_url}&download=1` : `${resData.qris_image_url}?download=1`)
-          : '#';
-        qrisDownloadBtn.href = downloadUrl;
-        qrisDownloadBtn.setAttribute('download', `QRIS-Code-${resData.order_code || 'Pesanan'}.png`);
       }
 
       if (invoiceLink) {

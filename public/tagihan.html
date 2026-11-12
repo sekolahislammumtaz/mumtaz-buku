@@ -62,7 +62,6 @@
           </div>
           <div class="invoice-meta-badge-wrap">
             <span id="invoice-order-code" class="invoice-order-badge">-</span>
-            <div id="invoice-status-badge" class="invoice-status-badge">Menunggu Pembayaran</div>
           </div>
         </header>
 
@@ -136,26 +135,10 @@
             <div id="invoice-qris-merchant" class="qris-merchant-badge">SEKOLAH ISLAM MUMTAZ</div>
           </div>
 
-          <div style="text-align: center; margin-top: 14px; margin-bottom: 6px;">
-            <div class="qris-view-toggle">
-              <button type="button" id="toggle-view-poster" class="qris-toggle-btn active" onclick="switchQRView('poster')">
-                <i class="fa-solid fa-file-image"></i> Poster Resmi
-              </button>
-              <button type="button" id="toggle-view-code" class="qris-toggle-btn" onclick="switchQRView('code')">
-                <i class="fa-solid fa-qrcode"></i> Kode QR Saja
-              </button>
-            </div>
-          </div>
-
           <div class="invoice-qris-box">
             <!-- Tampilan Poster Resmi -->
             <div id="invoice-poster-container" class="invoice-qris-poster-wrap">
               <img id="invoice-poster-image" src="" alt="Poster QRIS Resmi Bank BSI" class="invoice-qris-poster-img">
-            </div>
-
-            <!-- Tampilan Kode QR Saja -->
-            <div id="invoice-code-container" style="display: none;">
-              <img id="invoice-qris-image" src="" alt="Kode QRIS Pembayaran Pesanan Buku" class="invoice-qris-img">
             </div>
 
             <div class="invoice-qris-amount-lock" style="margin-top: 14px;">
@@ -163,26 +146,10 @@
             </div>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 10px; margin: 18px 0;">
+          <div style="margin-top: 16px;">
             <a href="#" id="invoice-poster-download-btn" class="btn-download-poster-primary" download="Poster-QRIS.png">
               <i class="fa-solid fa-file-arrow-down"></i> Unduh Poster QRIS Resmi (PNG)
             </a>
-            <a href="#" id="invoice-qris-download-btn" class="btn-download-qris-secondary" download="QRIS-Pesanan.png">
-              <i class="fa-solid fa-qrcode"></i> Unduh Kode QR Saja (PNG)
-            </a>
-          </div>
-
-          <!-- Panduan Ringkas Cara Bayar -->
-          <div class="invoice-qris-guide">
-            <div class="invoice-qris-guide-title">
-              <i class="fa-solid fa-circle-question"></i> Panduan Pembayaran via QRIS:
-            </div>
-            <ol class="invoice-qris-guide-list">
-              <li>Buka aplikasi <strong>BSI Mobile</strong>, <em>mobile banking</em> (BCA, Mandiri, BRI, BNI), atau <em>e-wallet</em> (GoPay, OVO, DANA, ShopeePay).</li>
-              <li>Pilih menu <strong>Scan QR / QRIS</strong>, lalu arahkan kamera ke kode QRIS di atas.</li>
-              <li><strong>Jika Anda membuka halaman ini di HP:</strong> Klik tombol <em>"Unduh Poster QRIS Resmi"</em> di atas, lalu buka menu QRIS di aplikasi perbankan Anda dan pilih ikon <strong>Upload dari Galeri / Foto</strong>.</li>
-              <li>Pastikan nama merchant penerima (<strong id="guide-merchant-name">SEKOLAH ISLAM MUMTAZ</strong>) dan total nominal telah sesuai, masukkan PIN transaksi Anda, lalu selesaikan pembayaran.</li>
-            </ol>
           </div>
         </section>
 
@@ -210,27 +177,6 @@
 
   <script src="/js/qris-renderer.js"></script>
   <script>
-    // Toggle tampilan poster atau kode QR saja
-    function switchQRView(mode) {
-      const posterContainer = document.getElementById('invoice-poster-container');
-      const codeContainer = document.getElementById('invoice-code-container');
-      const btnPoster = document.getElementById('toggle-view-poster');
-      const btnCode = document.getElementById('toggle-view-code');
-
-      if (mode === 'poster') {
-        if (posterContainer) posterContainer.style.display = 'block';
-        if (codeContainer) codeContainer.style.display = 'none';
-        if (btnPoster) btnPoster.classList.add('active');
-        if (btnCode) btnCode.classList.remove('active');
-      } else {
-        if (posterContainer) posterContainer.style.display = 'none';
-        if (codeContainer) codeContainer.style.display = 'block';
-        if (btnPoster) btnPoster.classList.remove('active');
-        if (btnCode) btnCode.classList.add('active');
-      }
-    }
-    window.switchQRView = switchQRView;
-
     // Helper format Rupiah
     function formatRupiah(number) {
       return 'Rp ' + Number(number || 0).toLocaleString('id-ID');
@@ -352,30 +298,16 @@
           noQrisSection.style.display = 'none';
 
           const merchantName = data.merchant_name || 'SEKOLAH ISLAM MUMTAZ';
-          document.getElementById('invoice-qris-merchant').textContent = merchantName;
-          document.getElementById('guide-merchant-name').textContent = merchantName;
+          const merchantBadgeEl = document.getElementById('invoice-qris-merchant');
+          if (merchantBadgeEl) merchantBadgeEl.textContent = merchantName;
           document.getElementById('invoice-qris-locked-amount').textContent = formatRupiah(data.total_price);
 
           const posterImgEl = document.getElementById('invoice-poster-image');
-          const qrisImgEl = document.getElementById('invoice-qris-image');
           const posterDownloadBtn = document.getElementById('invoice-poster-download-btn');
-          const qrisDownloadBtn = document.getElementById('invoice-qris-download-btn');
 
           // Pasang fallback sumber gambar awal
-          if (qrisImgEl) {
-            qrisImgEl.src = data.qris_data_url || (data.qris_image_url || '');
-          }
           if (posterImgEl) {
             posterImgEl.src = data.poster_image_url || (data.qris_data_url || data.qris_image_url || '');
-          }
-
-          // Atur tautan unduh kode QR saja
-          if (qrisDownloadBtn) {
-            const dlQrUrl = data.qris_image_url
-              ? (data.qris_image_url.includes('?') ? `${data.qris_image_url}&download=1` : `${data.qris_image_url}?download=1`)
-              : '#';
-            qrisDownloadBtn.href = dlQrUrl;
-            qrisDownloadBtn.setAttribute('download', `QRIS-Code-${data.order_code}.png`);
           }
 
           // Atur tautan unduh poster resmi
