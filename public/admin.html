@@ -134,6 +134,17 @@
             </div>
           </div>
 
+          <!-- Filters Pesanan -->
+          <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; flex: 1;">
+              <input type="text" id="search-order" class="form-control" placeholder="Cari nama siswa, VA, atau wali..." oninput="filterOrdersTable()" style="max-width: 280px;">
+              <select id="filter-order-class" class="form-control" onchange="filterOrdersTable()" style="max-width: 220px; min-width: 140px;">
+                <option value="all">Semua Kelas</option>
+                <!-- Diisi dinamis -->
+              </select>
+            </div>
+          </div>
+
           <!-- Orders Table -->
           <div class="table-responsive">
             <table class="data-table">
@@ -439,6 +450,44 @@
       <!-- TAB 4: QRIS SETTINGS -->
       <!-- ========================================== -->
       <div id="tab-qris" class="tab-content">
+        <!-- Sub-Tab Switcher Jenjang SMP & SMA (Khusus Divisi smp_sma) -->
+        <div id="smp-sma-qris-level-selector" style="display: none; margin-bottom: 20px; background: #FFF; padding: 14px 18px; border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm); border: 1px solid #E2E8F0;">
+          <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-layer-group" style="color: var(--primary-navy);"></i> Pengaturan QRIS Per Jenjang Pendidikan:
+            </span>
+            <small style="color: var(--text-muted); font-weight: 500; font-size: 0.78rem;">
+              Divisi SMP-SMA mendukung QRIS Bank BSI terpisah per tingkatan.
+            </small>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;" class="form-grid-3">
+            <button type="button" id="btn-qris-level-smp" onclick="switchQrisLevel('smp')" class="tab-btn active" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-radius: var(--border-radius-sm); font-weight: 700; border: 2px solid var(--primary-navy); background-color: #EFF6FF; text-align: left; cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-school" style="font-size: 1.15rem; color: var(--primary-navy);"></i>
+                <div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary-navy);">Tingkat SMP</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Kelas 7, 8, dan 9</div>
+                </div>
+              </div>
+              <span id="badge-qris-level-smp" class="qris-status-pill unconfigured" style="font-size: 0.72rem; padding: 3px 10px;">
+                <i class="fa-solid fa-circle-exclamation"></i> Belum Diatur
+              </span>
+            </button>
+            <button type="button" id="btn-qris-level-sma" onclick="switchQrisLevel('sma')" class="tab-btn" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-radius: var(--border-radius-sm); font-weight: 700; border: 2px solid #CBD5E1; background-color: #FFF; text-align: left; cursor: pointer;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-graduation-cap" style="font-size: 1.15rem; color: var(--primary-navy);"></i>
+                <div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary-navy);">Tingkat SMA</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Kelas 10, 11, dan 12</div>
+                </div>
+              </div>
+              <span id="badge-qris-level-sma" class="qris-status-pill unconfigured" style="font-size: 0.72rem; padding: 3px 10px;">
+                <i class="fa-solid fa-circle-exclamation"></i> Belum Diatur
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div class="qris-grid-layout">
           
           <!-- Kartu 1: Konfigurasi QRIS Statis Bank BSI -->

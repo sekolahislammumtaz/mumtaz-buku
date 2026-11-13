@@ -58,9 +58,60 @@ function verifyOrderToken(order, token) {
   return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedToken));
 }
 
-// Helper membaca QRIS statis divisi dari settings (dengan opsi fallback)
-async function getDivisionStaticQris(division, fallbackToDefault = false) {
+// Helper membaca QRIS statis divisi dari settings (dengan opsi fallback & multi-jenjang SMP/SMA)
+async function getDivisionStaticQris(division, fallbackToDefault = false, className = null, qrisLevel = null) {
   const divKey = (division || 'mumtaz').toLowerCase();
+
+  if (divKey === 'smp_sma') {
+    let level = null;
+    if (qrisLevel) {
+      const ql = String(qrisLevel).toLowerCase().trim();
+      if (ql === 'smp' || ql === 'sma') level = ql;
+    }
+    if (!level && className !== null && className !== undefined) {
+      const numStr = String(className).replace(/[^0-9]/g, '');
+      const num = parseInt(numStr, 10);
+      if (num >= 7 && num <= 9) {
+        level = 'smp';
+      } else if (num >= 10 && num <= 12) {
+        level = 'sma';
+      }
+    }
+
+    if (level) {
+      const row = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [`qris_static_smp_sma_${level}`]);
+      if (row && row.value && row.value.trim()) return row.value.trim();
+
+      if (fallbackToDefault) {
+        const partnerLevel = level === 'smp' ? 'sma' : 'smp';
+        const partnerRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [`qris_static_smp_sma_${partnerLevel}`]);
+        if (partnerRow && partnerRow.value && partnerRow.value.trim()) return partnerRow.value.trim();
+
+        const legacyRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma']);
+        if (legacyRow && legacyRow.value && legacyRow.value.trim()) return legacyRow.value.trim();
+
+        return DEFAULT_STATIC_QRIS_BSI;
+      }
+      return null;
+    }
+
+    // Jika level tidak dapat ditentukan dari param (misal cek status umum divisi smp_sma)
+    const smpRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_smp']);
+    if (smpRow && smpRow.value && smpRow.value.trim()) return smpRow.value.trim();
+
+    const smaRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_sma']);
+    if (smaRow && smaRow.value && smaRow.value.trim()) return smaRow.value.trim();
+
+    const legacyRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma']);
+    if (legacyRow && legacyRow.value && legacyRow.value.trim()) return legacyRow.value.trim();
+
+    if (fallbackToDefault) {
+      return DEFAULT_STATIC_QRIS_BSI;
+    }
+    return null;
+  }
+
+  // Divisi lain (SD, Mumtaz)
   const settingKey = `qris_static_${divKey}`;
   const row = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [settingKey]);
   if (row && row.value && row.value.trim()) return row.value.trim();
@@ -372,7 +423,7 @@ app.post('/api/orders', async (req, res) => {
     let nmid = null;
     let terminalCriteria = null;
 
-    const staticQris = await getDivisionStaticQris(orderDivision, true);
+    const staticQris = await getDivisionStaticQris(orderDivision, true, class_name);
     if (staticQris && verifiedTotalPrice > 0) {
       const qrisVal = validateQRIS(staticQris);
       if (qrisVal.valid) {
@@ -892,13 +943,30 @@ app.post('/api/admin/students/import', authenticateAdmin, upload.single('file'),
 app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
   const divMeta = getDivisionMeta(division);
+  const qrisLevel = (req.query.level && typeof req.query.level === 'string')
+    ? req.query.level.toLowerCase().trim()
+    : (division === 'smp_sma' ? 'smp' : null);
+
   try {
-    const staticQris = await getDivisionStaticQris(division, false);
+    let smpConfigured = false;
+    let smaConfigured = false;
+
+    if (division === 'smp_sma') {
+      const smpVal = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_smp']);
+      const smaVal = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_sma']);
+      smpConfigured = !!(smpVal && smpVal.value && smpVal.value.trim());
+      smaConfigured = !!(smaVal && smaVal.value && smaVal.value.trim());
+    }
+
+    const staticQris = await getDivisionStaticQris(division, false, null, qrisLevel);
     if (!staticQris) {
       return res.json({
         configured: false,
         division,
         division_name: divMeta.name,
+        level: division === 'smp_sma' ? (qrisLevel || 'smp') : null,
+        smp_configured: smpConfigured,
+        sma_configured: smaConfigured,
         qris_string: null,
         merchant_name: null,
         merchant_city: null,
@@ -912,6 +980,9 @@ app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
       configured: true,
       division,
       division_name: divMeta.name,
+      level: division === 'smp_sma' ? (qrisLevel || 'smp') : null,
+      smp_configured: smpConfigured,
+      sma_configured: smaConfigured,
       qris_string: staticQris,
       merchant_name: details.merchantName || (val.valid ? val.data.merchantName : null),
       merchant_city: details.merchantCity || (val.valid ? val.data.merchantCity : null),
@@ -930,7 +1001,7 @@ app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
   const divMeta = getDivisionMeta(division);
-  const { qris_string, apply_all } = req.body;
+  const { qris_string, apply_all, level } = req.body;
 
   if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
     return res.status(400).json({ message: 'String QRIS wajib diisi.' });
@@ -945,23 +1016,43 @@ app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
     });
   }
 
+  const merchantName = (val.data.merchantName || '').trim();
+  const merchantCity = (val.data.merchantCity || '').trim();
+
   try {
     if (apply_all === true || apply_all === 'true') {
       await saveSetting('qris_static_sd', cleanQris);
       await saveSetting('qris_static_smp_sma', cleanQris);
+      await saveSetting('qris_static_smp_sma_smp', cleanQris);
+      await saveSetting('qris_static_smp_sma_sma', cleanQris);
       await saveSetting('qris_static_mumtaz', cleanQris);
       return res.json({
-        message: 'QRIS statis berhasil disimpan untuk seluruh divisi (SD, SMP-SMA, Mumtaz).',
-        merchant_name: val.data.merchantName,
-        merchant_city: val.data.merchantCity,
-        applied_to: ['sd', 'smp_sma', 'mumtaz']
+        message: 'QRIS statis berhasil disimpan untuk seluruh divisi & jenjang (SD, SMP, SMA, Mumtaz).',
+        merchant_name: merchantName,
+        merchant_city: merchantCity,
+        applied_to: ['sd', 'smp_sma', 'smp_sma_smp', 'smp_sma_sma', 'mumtaz']
+      });
+    } else if (division === 'smp_sma') {
+      const targetLevel = (level && String(level).toLowerCase() === 'sma') ? 'sma' : 'smp';
+      await saveSetting(`qris_static_smp_sma_${targetLevel}`, cleanQris);
+      // Simpan juga ke fallback legacy jika belum pernah terisi
+      const legacy = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma']);
+      if (!legacy || !legacy.value || !legacy.value.trim()) {
+        await saveSetting('qris_static_smp_sma', cleanQris);
+      }
+      return res.json({
+        message: `QRIS statis berhasil disimpan khusus untuk jenjang ${targetLevel.toUpperCase()} (${divMeta.name}).`,
+        merchant_name: merchantName,
+        merchant_city: merchantCity,
+        level: targetLevel,
+        applied_to: [`smp_sma_${targetLevel}`]
       });
     } else {
       await saveSetting(`qris_static_${division}`, cleanQris);
       return res.json({
         message: `QRIS statis berhasil disimpan khusus untuk divisi ${divMeta.name}.`,
-        merchant_name: val.data.merchantName,
-        merchant_city: val.data.merchantCity,
+        merchant_name: merchantName,
+        merchant_city: merchantCity,
         applied_to: [division]
       });
     }
@@ -975,9 +1066,21 @@ app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
 app.delete('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
   const divMeta = getDivisionMeta(division);
+  const qrisLevel = (req.query.level && typeof req.query.level === 'string')
+    ? req.query.level.toLowerCase().trim()
+    : null;
+
   try {
-    await dbQuery.run('DELETE FROM settings WHERE key = ?', [`qris_static_${division}`]);
-    res.json({ message: `QRIS statis untuk divisi ${divMeta.name} berhasil dihapus/direset.` });
+    if (division === 'smp_sma' && (qrisLevel === 'smp' || qrisLevel === 'sma')) {
+      await dbQuery.run('DELETE FROM settings WHERE key = ?', [`qris_static_smp_sma_${qrisLevel}`]);
+      return res.json({ message: `QRIS statis jenjang ${qrisLevel.toUpperCase()} (${divMeta.name}) berhasil dihapus/direset.` });
+    } else {
+      await dbQuery.run('DELETE FROM settings WHERE key = ?', [`qris_static_${division}`]);
+      if (division === 'smp_sma') {
+        await dbQuery.run('DELETE FROM settings WHERE key IN (?, ?)', ['qris_static_smp_sma_smp', 'qris_static_smp_sma_sma']);
+      }
+      res.json({ message: `QRIS statis untuk divisi ${divMeta.name} berhasil dihapus/direset.` });
+    }
   } catch (error) {
     console.error('Error deleting QRIS:', error);
     res.status(500).json({ message: 'Gagal menghapus konfigurasi QRIS.' });
@@ -988,11 +1091,11 @@ app.delete('/api/admin/qris', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
   const divMeta = getDivisionMeta(division);
-  let { qris_string, amount } = req.body;
+  let { qris_string, amount, level } = req.body;
 
-  // Jika string QRIS tidak dikirim, otomatis gunakan konfigurasi QRIS milik divisi yang aktif
+  // Jika string QRIS tidak dikirim, otomatis gunakan konfigurasi QRIS milik divisi/jenjang yang aktif
   if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
-    qris_string = await getDivisionStaticQris(division, true);
+    qris_string = await getDivisionStaticQris(division, true, null, level);
   }
 
   if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
@@ -1020,6 +1123,7 @@ app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
     res.json({
       division,
       division_name: divMeta.name,
+      level: division === 'smp_sma' ? (level || 'smp') : null,
       dynamic_qris: dynamicResult.dynamicQris,
       merchant_name: dynamicResult.merchantName,
       merchant_city: dynamicResult.merchantCity,
@@ -1047,6 +1151,16 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
     const qrisConfigured = !!staticQris;
     const divMeta = getDivisionMeta(division);
 
+    let hasSmp = false;
+    let hasSma = false;
+    if (division === 'smp_sma') {
+      const smpVal = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_smp']);
+      const smaVal = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma_sma']);
+      const legacyVal = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma']);
+      hasSmp = !!((smpVal && smpVal.value && smpVal.value.trim()) || (legacyVal && legacyVal.value && legacyVal.value.trim()));
+      hasSma = !!((smaVal && smaVal.value && smaVal.value.trim()) || (legacyVal && legacyVal.value && legacyVal.value.trim()));
+    }
+
     // Parse book_details JSON string for client convenience and inject secure tokens
     const formattedOrders = orders.map(order => {
       try {
@@ -1060,7 +1174,14 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
       order.invoice_path = `/tagihan.html?id=${order.id}&t=${token}`;
       order.qris_image_path = `/api/orders/${order.id}/qris.png?t=${token}`;
       order.poster_image_path = `/api/orders/${order.id}/poster.png?t=${token}`;
-      order.qris_configured = qrisConfigured;
+      
+      let orderQrisConfigured = qrisConfigured;
+      if (division === 'smp_sma' && order.class_name) {
+        const cNum = parseInt(String(order.class_name).replace(/[^0-9]/g, ''), 10);
+        if (cNum >= 7 && cNum <= 9) orderQrisConfigured = hasSmp;
+        else if (cNum >= 10 && cNum <= 12) orderQrisConfigured = hasSma;
+      }
+      order.qris_configured = orderQrisConfigured;
       return order;
     });
     res.json(formattedOrders);
@@ -1324,7 +1445,14 @@ app.get('/api/admin/orders/export-recap', authenticateAdmin, async (req, res) =>
     const defaultClasses = division === 'sd' 
       ? ['1', '2', '3', '4', '5', '6'] 
       : ['7', '8', '9', '10', '11', '12'];
-    const classesToExport = kelas && kelas !== 'all' ? [kelas] : defaultClasses;
+    let classesToExport = defaultClasses;
+    if (kelas === 'smp_all') {
+      classesToExport = ['7', '8', '9'];
+    } else if (kelas === 'sma_all') {
+      classesToExport = ['10', '11', '12'];
+    } else if (kelas && kelas !== 'all') {
+      classesToExport = [kelas];
+    }
     const wb = xlsx.utils.book_new();
 
     for (const cls of classesToExport) {
@@ -1385,7 +1513,11 @@ app.get('/api/admin/orders/export-recap', authenticateAdmin, async (req, res) =>
     }
 
     const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    const filename = kelas && kelas !== 'all' ? `rekap_pesanan_${division}_kelas_${kelas}.xlsx` : `rekap_pesanan_buku_${division}_per_kelas.xlsx`;
+    let filenameSuffix = 'semua_kelas';
+    if (kelas === 'smp_all') filenameSuffix = 'smp_kelas_7_8_9';
+    else if (kelas === 'sma_all') filenameSuffix = 'sma_kelas_10_11_12';
+    else if (kelas && kelas !== 'all') filenameSuffix = `kelas_${kelas}`;
+    const filename = `rekap_pesanan_${division}_${filenameSuffix}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
@@ -1428,7 +1560,7 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
 
     const divMeta = getDivisionMeta(order.division);
     const orderCode = `${divMeta.prefix}-${String(order.id).padStart(4, '0')}`;
-    const staticQris = await getDivisionStaticQris(order.division, true);
+    const staticQris = await getDivisionStaticQris(order.division, true, order.class_name);
 
     let qrisConfigured = false;
     let merchantName = null;
@@ -1503,7 +1635,7 @@ app.get('/api/orders/:id/qris.png', async (req, res) => {
       return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
     }
 
-    const staticQris = await getDivisionStaticQris(order.division, true);
+    const staticQris = await getDivisionStaticQris(order.division, true, order.class_name);
     if (!staticQris) {
       return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
     }
@@ -1556,7 +1688,7 @@ app.get('/api/orders/:id/poster.png', async (req, res) => {
       return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
     }
 
-    const staticQris = await getDivisionStaticQris(order.division, true);
+    const staticQris = await getDivisionStaticQris(order.division, true, order.class_name);
     if (!staticQris) {
       return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
     }

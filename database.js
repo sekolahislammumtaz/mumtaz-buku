@@ -369,6 +369,31 @@ async function initDatabase() {
     }
   }
 
+  // Seed default static QRIS Bank BSI per jenjang untuk divisi SMP & SMA Islam Nazhirah
+  const smpSmaRow = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_smp_sma']);
+  const defaultSmpSmaVal = (smpSmaRow && smpSmaRow.value && smpSmaRow.value.trim()) ? smpSmaRow.value.trim() : defaultInitialQris;
+
+  const smpSmaLevelSettings = [
+    { key: 'qris_static_smp_sma_smp', value: defaultSmpSmaVal },
+    { key: 'qris_static_smp_sma_sma', value: defaultSmpSmaVal }
+  ];
+
+  for (const item of smpSmaLevelSettings) {
+    const existing = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [item.key]);
+    if (!existing || !existing.value || !existing.value.trim()) {
+      if (existing) {
+        await dbQuery.run('UPDATE settings SET value = ? WHERE key = ?', [item.value, item.key]);
+      } else {
+        try {
+          await dbQuery.run('INSERT INTO settings (key, value) VALUES (?, ?)', [item.key, item.value]);
+        } catch (e) {
+          await dbQuery.run('UPDATE settings SET value = ? WHERE key = ?', [item.value, item.key]);
+        }
+      }
+      console.log(`Setting ${item.key} initialized.`);
+    }
+  }
+
   console.log('Database initialized successfully with multi-division support.');
 }
 

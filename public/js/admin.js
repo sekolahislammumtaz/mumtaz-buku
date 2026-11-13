@@ -28,6 +28,7 @@ const DIVISION_METADATA = {
 // Admin App Variables
 let token = localStorage.getItem('admin_token') || localStorage.getItem('mumtaz_admin_token') || '';
 let activeDivision = localStorage.getItem('admin_division') || 'mumtaz';
+let activeQrisLevel = 'smp';
 let allOrders = [];
 let allBooks = [];
 let allStudents = [];
@@ -160,7 +161,19 @@ function updateDivisionUI(division) {
   // 4. Update Label Divisi Pengaturan QRIS
   const qrisDivLabel = document.getElementById('qris-active-division-label');
   if (qrisDivLabel) {
-    qrisDivLabel.innerText = meta.name;
+    const levelText = division === 'smp_sma'
+      ? `${meta.name} - Tingkat ${activeQrisLevel.toUpperCase()} (Kelas ${activeQrisLevel === 'smp' ? '7–9' : '10–12'})`
+      : meta.name;
+    qrisDivLabel.innerText = levelText;
+  }
+
+  // 5. Update Visibility Switcher Jenjang SMP-SMA di Pengaturan QRIS
+  const qrisLevelSelector = document.getElementById('smp-sma-qris-level-selector');
+  if (qrisLevelSelector) {
+    qrisLevelSelector.style.display = division === 'smp_sma' ? 'block' : 'none';
+  }
+  if (division === 'smp_sma') {
+    switchQrisLevel(activeQrisLevel || 'smp', false);
   }
 
   // Helper untuk mengisi dropdown kelas
@@ -173,6 +186,19 @@ function updateDivisionUI(division) {
       optAll.value = 'all';
       optAll.textContent = 'Semua Kelas';
       select.appendChild(optAll);
+
+      // Opsi filter grup SMP & SMA khusus untuk divisi smp_sma
+      if (division === 'smp_sma' && ['filter-class', 'filter-student-class', 'filter-order-class', 'recap-class-select'].includes(elId)) {
+        const optSmp = document.createElement('option');
+        optSmp.value = 'smp_all';
+        optSmp.textContent = '🏫 Semua SMP (Kelas 7–9)';
+        select.appendChild(optSmp);
+
+        const optSma = document.createElement('option');
+        optSma.value = 'sma_all';
+        optSma.textContent = '🎓 Semua SMA (Kelas 10–12)';
+        select.appendChild(optSma);
+      }
     } else {
       const optDef = document.createElement('option');
       optDef.value = '';
@@ -192,6 +218,7 @@ function updateDivisionUI(division) {
 
   // Isi semua dropdown kelas di dashboard
   fillDropdown('recap-class-select', true);
+  fillDropdown('filter-order-class', true);
   fillDropdown('book-class', false, 'Pilih...');
   fillDropdown('import-class', false, 'Pilih kelas...');
   fillDropdown('clear-class', false, 'Pilih kelas...');
@@ -202,6 +229,53 @@ function updateDivisionUI(division) {
   fillDropdown('edit-order-class', false, 'Pilih kelas...');
   fillDropdown('edit-student-class', false, 'Pilih kelas...');
 }
+
+// Fungsi ganti jenjang QRIS untuk divisi SMP-SMA
+function switchQrisLevel(level, reload = true) {
+  if (level !== 'smp' && level !== 'sma') return;
+  activeQrisLevel = level;
+
+  const btnSmp = document.getElementById('btn-qris-level-smp');
+  const btnSma = document.getElementById('btn-qris-level-sma');
+
+  if (level === 'smp') {
+    if (btnSmp) {
+      btnSmp.classList.add('active');
+      btnSmp.style.borderColor = 'var(--primary-navy)';
+      btnSmp.style.backgroundColor = '#EFF6FF';
+    }
+    if (btnSma) {
+      btnSma.classList.remove('active');
+      btnSma.style.borderColor = '#CBD5E1';
+      btnSma.style.backgroundColor = '#FFF';
+    }
+  } else {
+    if (btnSma) {
+      btnSma.classList.add('active');
+      btnSma.style.borderColor = 'var(--primary-navy)';
+      btnSma.style.backgroundColor = '#EFF6FF';
+    }
+    if (btnSmp) {
+      btnSmp.classList.remove('active');
+      btnSmp.style.borderColor = '#CBD5E1';
+      btnSmp.style.backgroundColor = '#FFF';
+    }
+  }
+
+  const divLabel = document.getElementById('qris-active-division-label');
+  if (divLabel) {
+    const meta = DIVISION_METADATA[activeDivision] || DIVISION_METADATA.mumtaz;
+    const levelText = activeDivision === 'smp_sma'
+      ? `${meta.name} - Tingkat ${activeQrisLevel.toUpperCase()} (Kelas ${activeQrisLevel === 'smp' ? '7–9' : '10–12'})`
+      : meta.name;
+    divLabel.innerText = levelText;
+  }
+
+  if (reload) {
+    loadQrisSettings();
+  }
+}
+window.switchQrisLevel = switchQrisLevel;
 
 // API Fetch wrapper dengan Bearer Token
 async function apiFetch(url, options = {}) {
@@ -351,18 +425,55 @@ async function loadOrders() {
     if (!response.ok) throw new Error();
     
     allOrders = await response.json();
-    renderOrdersTable();
+    filterOrdersTable();
   } catch (error) {
     showToast('Gagal memuat data pesanan.', 'error');
   }
 }
 
-function renderOrdersTable() {
-  if (allOrders.length === 0) {
+function filterOrdersTable() {
+  const searchInput = document.getElementById('search-order');
+  const classSelect = document.getElementById('filter-order-class');
+
+  const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const classFilter = classSelect ? classSelect.value : 'all';
+
+  const filtered = allOrders.filter(order => {
+    const matchesSearch = !search ||
+      (order.student_name && order.student_name.toLowerCase().includes(search)) ||
+      (order.va_number && order.va_number.toLowerCase().includes(search)) ||
+      (order.parent_name && order.parent_name.toLowerCase().includes(search)) ||
+      (order.parent_whatsapp && order.parent_whatsapp.toLowerCase().includes(search)) ||
+      (order.order_code && order.order_code.toLowerCase().includes(search));
+
+    let matchesClass = false;
+    const oClass = String(order.class_name || '').replace(/[^0-9]/g, '');
+    if (classFilter === 'all') {
+      matchesClass = true;
+    } else if (classFilter === 'smp_all') {
+      matchesClass = ['7', '8', '9'].includes(oClass);
+    } else if (classFilter === 'sma_all') {
+      matchesClass = ['10', '11', '12'].includes(oClass);
+    } else {
+      matchesClass = String(order.class_name) === classFilter;
+    }
+
+    return matchesSearch && matchesClass;
+  });
+
+  renderOrdersTable(filtered);
+}
+window.filterOrdersTable = filterOrdersTable;
+
+function renderOrdersTable(ordersToRender = allOrders) {
+  if (ordersToRender.length === 0) {
+    const emptyMsg = allOrders.length === 0
+      ? 'Belum ada pesanan buku yang masuk untuk divisi ini.'
+      : 'Tidak ada data pesanan yang sesuai dengan filter pencarian.';
     ordersTableBody.innerHTML = `
       <tr>
         <td colspan="10" style="text-align: center; padding: 30px; color: var(--text-muted);">
-          Belum ada pesanan buku yang masuk untuk divisi ini.
+          ${emptyMsg}
         </td>
       </tr>
     `;
@@ -372,7 +483,7 @@ function renderOrdersTable() {
   ordersTableBody.innerHTML = '';
   const prefix = (DIVISION_METADATA[activeDivision] ? DIVISION_METADATA[activeDivision].prefix : 'ORDER');
   
-  allOrders.forEach((order, index) => {
+  ordersToRender.forEach((order, index) => {
     const tr = document.createElement('tr');
     
     // Books list rendering
@@ -604,9 +715,14 @@ async function exportRecapToExcel() {
     const a = document.createElement('a');
     a.href = url;
     
-    const filename = classVal === 'all' 
-      ? `rekap_pesanan_buku_${activeDivision}_semua_kelas.xlsx` 
-      : `rekap_pesanan_${activeDivision}_kelas_${classVal}.xlsx`;
+    let filename = `rekap_pesanan_buku_${activeDivision}_semua_kelas.xlsx`;
+    if (classVal === 'smp_all') {
+      filename = `rekap_pesanan_${activeDivision}_smp_kelas_7_8_9.xlsx`;
+    } else if (classVal === 'sma_all') {
+      filename = `rekap_pesanan_${activeDivision}_sma_kelas_10_11_12.xlsx`;
+    } else if (classVal && classVal !== 'all') {
+      filename = `rekap_pesanan_${activeDivision}_kelas_${classVal}.xlsx`;
+    }
       
     a.download = filename;
     document.body.appendChild(a);
@@ -675,7 +791,11 @@ function filterBooksTable() {
   
   let filtered = allBooks;
   
-  if (classVal !== 'all') {
+  if (classVal === 'smp_all') {
+    filtered = filtered.filter(b => ['7', '8', '9'].includes(String(b.kelas).replace(/[^0-9]/g, '')));
+  } else if (classVal === 'sma_all') {
+    filtered = filtered.filter(b => ['10', '11', '12'].includes(String(b.kelas).replace(/[^0-9]/g, '')));
+  } else if (classVal !== 'all') {
     filtered = filtered.filter(b => b.kelas.toString() === classVal);
   }
   
@@ -688,6 +808,7 @@ function filterBooksTable() {
   
   renderBooksTable(filtered);
 }
+window.filterBooksTable = filterBooksTable;
 
 // Add Book Manual
 async function handleAddBook(event) {
@@ -1071,13 +1192,29 @@ function filterStudentsTable() {
   const classFilter = document.getElementById('filter-student-class').value;
 
   const filtered = allStudents.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery) || (student.va_number && student.va_number.includes(searchQuery));
-    const matchesClass = classFilter === 'all' || student.kelas.toString() === classFilter;
+    const matchesSearch = !searchQuery || 
+      student.name.toLowerCase().includes(searchQuery) || 
+      (student.va_number && student.va_number.includes(searchQuery)) ||
+      (student.email && student.email.toLowerCase().includes(searchQuery));
+
+    let matchesClass = false;
+    const sClass = String(student.kelas || '').replace(/[^0-9]/g, '');
+    if (classFilter === 'all') {
+      matchesClass = true;
+    } else if (classFilter === 'smp_all') {
+      matchesClass = ['7', '8', '9'].includes(sClass);
+    } else if (classFilter === 'sma_all') {
+      matchesClass = ['10', '11', '12'].includes(sClass);
+    } else {
+      matchesClass = student.kelas.toString() === classFilter;
+    }
+
     return matchesSearch && matchesClass;
   });
 
   renderStudentsTable(filtered);
 }
+window.filterStudentsTable = filterStudentsTable;
 
 async function deleteStudent(id) {
   if (!confirm('Apakah Anda yakin ingin menghapus data siswa ini?')) return;
@@ -1163,7 +1300,10 @@ async function loadQrisSettings() {
   
   if (divLabel) {
     const meta = DIVISION_METADATA[activeDivision] || DIVISION_METADATA.mumtaz;
-    divLabel.innerText = meta.name;
+    const levelText = activeDivision === 'smp_sma'
+      ? `${meta.name} - Tingkat ${activeQrisLevel.toUpperCase()} (Kelas ${activeQrisLevel === 'smp' ? '7–9' : '10–12'})`
+      : meta.name;
+    divLabel.innerText = levelText;
   }
 
   if (statusBadge) {
@@ -1172,10 +1312,37 @@ async function loadQrisSettings() {
   }
 
   try {
-    const response = await apiFetch('/api/admin/qris');
+    const qrisUrl = activeDivision === 'smp_sma'
+      ? `/api/admin/qris?level=${encodeURIComponent(activeQrisLevel)}`
+      : '/api/admin/qris';
+    const response = await apiFetch(qrisUrl);
     if (!response.ok) throw new Error('Gagal mengambil konfigurasi QRIS');
     
     const data = await response.json();
+
+    // Update status badge per tombol jenjang jika smp_sma
+    if (activeDivision === 'smp_sma') {
+      const badgeSmp = document.getElementById('badge-qris-level-smp');
+      const badgeSma = document.getElementById('badge-qris-level-sma');
+      if (badgeSmp) {
+        if (data.smp_configured) {
+          badgeSmp.className = 'qris-status-pill configured';
+          badgeSmp.innerHTML = '<i class="fa-solid fa-circle-check"></i> Terkonfigurasi';
+        } else {
+          badgeSmp.className = 'qris-status-pill unconfigured';
+          badgeSmp.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Belum Diatur';
+        }
+      }
+      if (badgeSma) {
+        if (data.sma_configured) {
+          badgeSma.className = 'qris-status-pill configured';
+          badgeSma.innerHTML = '<i class="fa-solid fa-circle-check"></i> Terkonfigurasi';
+        } else {
+          badgeSma.className = 'qris-status-pill unconfigured';
+          badgeSma.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Belum Diatur';
+        }
+      }
+    }
     
     if (data.configured && data.valid) {
       if (statusBadge) {
@@ -1205,9 +1372,12 @@ async function loadQrisSettings() {
         statusBadge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Belum Diatur';
       }
       if (merchantDisplay) {
+        const notConfiguredMsg = activeDivision === 'smp_sma'
+          ? `Belum ada konfigurasi QRIS statis Bank BSI yang tersimpan untuk jenjang ${activeQrisLevel.toUpperCase()}.`
+          : 'Belum ada konfigurasi QRIS statis Bank BSI yang tersimpan untuk divisi ini.';
         merchantDisplay.innerHTML = `
           <i class="fa-solid fa-circle-info" style="color: #64748B; font-size: 1.1rem;"></i>
-          <span>Belum ada konfigurasi QRIS statis Bank BSI yang tersimpan untuk divisi ini.</span>
+          <span>${notConfiguredMsg}</span>
         `;
       }
       if (stringInput) {
@@ -1369,12 +1539,16 @@ async function handleSaveQris(event) {
 
   try {
     showToast('Menyimpan konfigurasi QRIS...', 'success');
+    const payload = { qris_string, apply_all };
+    if (activeDivision === 'smp_sma') {
+      payload.level = activeQrisLevel;
+    }
     const response = await apiFetch('/api/admin/qris', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ qris_string, apply_all })
+      body: JSON.stringify(payload)
     });
 
     const resData = await response.json();
@@ -1397,14 +1571,18 @@ async function handleSaveQris(event) {
  */
 async function handleDeleteQris() {
   const meta = DIVISION_METADATA[activeDivision] || DIVISION_METADATA.mumtaz;
+  const levelText = activeDivision === 'smp_sma' ? ` jenjang ${activeQrisLevel.toUpperCase()}` : '';
   const confirmDelete = confirm(
-    `Apakah Anda yakin ingin menghapus konfigurasi QRIS statis untuk divisi ${meta.name}?\n\nPesanan di divisi ini tidak akan dapat menampilkan QRIS Bank BSI otomatis sampai QRIS baru diatur.`
+    `Apakah Anda yakin ingin menghapus konfigurasi QRIS statis untuk divisi ${meta.name}${levelText}?\n\nPesanan di divisi/jenjang ini tidak akan dapat menampilkan QRIS Bank BSI otomatis sampai QRIS baru diatur.`
   );
   if (!confirmDelete) return;
 
   try {
     showToast('Menghapus konfigurasi QRIS...', 'success');
-    const response = await apiFetch('/api/admin/qris', {
+    const deleteUrl = activeDivision === 'smp_sma'
+      ? `/api/admin/qris?level=${encodeURIComponent(activeQrisLevel)}`
+      : '/api/admin/qris';
+    const response = await apiFetch(deleteUrl, {
       method: 'DELETE'
     });
 
@@ -1469,12 +1647,16 @@ async function handlePreviewQris() {
   }
 
   try {
+    const payload = { qris_string, amount };
+    if (activeDivision === 'smp_sma') {
+      payload.level = activeQrisLevel;
+    }
     const response = await apiFetch('/api/admin/qris/preview', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ qris_string, amount })
+      body: JSON.stringify(payload)
     });
 
     const data = await response.json();
