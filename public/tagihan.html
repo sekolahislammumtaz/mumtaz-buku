@@ -321,7 +321,7 @@
 
           // Rendring instan canvas browser jika renderer tersedia
           if (window.QRIS_RENDERER && data.qris_data_url) {
-            window.QRIS_RENDERER.renderQRISTemplate(null, data.qris_data_url).then(rendered => {
+            window.QRIS_RENDERER.renderQRISTemplate(null, data.qris_data_url, { division: data.division }).then(rendered => {
               if (posterImgEl) posterImgEl.src = rendered.dataUrl;
               if (posterDownloadBtn) {
                 posterDownloadBtn.onclick = (e) => {

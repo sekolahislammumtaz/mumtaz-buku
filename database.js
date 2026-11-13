@@ -347,18 +347,24 @@ async function initDatabase() {
     }
   }
 
-  // Seed default static QRIS Bank BSI Sekolah Islam Mumtaz
-  const defaultQrisBSI = '00020101021162070703A0126640017ID.CO.BANKBSI.WWW0118936004510000603903021000004334440303URE51440014ID.CO.QRIS.WWW0215ID20254506276530303URE5204829953033605802ID5920SEKOLAH ISLAM MUMTAZ6014BANDAR LAMPUNG61053511663042286';
+  // Seed default static QRIS Bank BSI untuk masing-masing divisi
+  const oldQrisRow = await dbQuery.get("SELECT value FROM settings WHERE key IN ('qris_static', 'qris_static_string')");
+  const defaultInitialQris = (oldQrisRow && oldQrisRow.value && oldQrisRow.value.trim()) ? oldQrisRow.value.trim() : DEFAULT_STATIC_QRIS_BSI;
+
   const qrisSettings = [
-    { key: 'qris_static_mumtaz', value: defaultQrisBSI },
-    { key: 'qris_static_sd', value: defaultQrisBSI },
-    { key: 'qris_static_smp_sma', value: defaultQrisBSI }
+    { key: 'qris_static_mumtaz', value: defaultInitialQris },
+    { key: 'qris_static_sd', value: defaultInitialQris },
+    { key: 'qris_static_smp_sma', value: defaultInitialQris }
   ];
 
   for (const item of qrisSettings) {
     const existing = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [item.key]);
-    if (!existing) {
-      await dbQuery.run('INSERT INTO settings (key, value) VALUES (?, ?)', [item.key, item.value]);
+    if (!existing || !existing.value || !existing.value.trim()) {
+      if (existing) {
+        await dbQuery.run('UPDATE settings SET value = ? WHERE key = ?', [item.value, item.key]);
+      } else {
+        await dbQuery.run('INSERT INTO settings (key, value) VALUES (?, ?)', [item.key, item.value]);
+      }
       console.log(`Setting ${item.key} initialized with official BSI QRIS.`);
     }
   }
@@ -366,9 +372,13 @@ async function initDatabase() {
   console.log('Database initialized successfully with multi-division support.');
 }
 
+// String QRIS Statis Resmi Bank BSI (Default Sekolah Islam Mumtaz)
+const DEFAULT_STATIC_QRIS_BSI = '00020101021162070703A0126640017ID.CO.BANKBSI.WWW0118936004510000603903021000004334440303URE51440014ID.CO.QRIS.WWW0215ID20254506276530303URE5204829953033605802ID5920SEKOLAH ISLAM MUMTAZ6014BANDAR LAMPUNG61053511663042286';
+
 module.exports = {
   db,
   initDatabase,
   hashPassword,
-  dbQuery
+  dbQuery,
+  DEFAULT_STATIC_QRIS_BSI
 };

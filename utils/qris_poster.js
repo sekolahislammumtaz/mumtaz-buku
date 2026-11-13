@@ -3,7 +3,6 @@ const path = require('path');
 const { PNG } = require('pngjs');
 const QRCode = require('qrcode');
 
-const TEMPLATE_PATH = path.join(__dirname, '..', 'public', 'images', 'qris-template-mumtaz.png');
 const QR_BOX = {
   x: 161,
   y: 329,
@@ -11,27 +10,48 @@ const QR_BOX = {
   height: 403,
 };
 
-// Cache template buffer in memory to avoid reading disk on every request
-let cachedTemplateBuffer = null;
+// Cache template buffer in memory per division to avoid reading disk on every request
+const templateCache = new Map();
 
-function getTemplateBuffer() {
-  if (!cachedTemplateBuffer) {
-    if (!fs.existsSync(TEMPLATE_PATH)) {
-      throw new Error(`Template poster QRIS tidak ditemukan di: ${TEMPLATE_PATH}`);
-    }
-    cachedTemplateBuffer = fs.readFileSync(TEMPLATE_PATH);
+function getTemplateBuffer(division) {
+  const divKey = (division || 'mumtaz').toLowerCase();
+  if (templateCache.has(divKey)) {
+    return templateCache.get(divKey);
   }
-  return cachedTemplateBuffer;
+
+  // Dukung template per divisi jika tersedia, fallback ke default mumtaz
+  const candidateNames = [
+    `qris-template-${divKey}.png`,
+    'qris-template-mumtaz.png'
+  ];
+
+  for (const name of candidateNames) {
+    const fullPath = path.join(__dirname, '..', 'public', 'images', name);
+    if (fs.existsSync(fullPath)) {
+      try {
+        const buf = fs.readFileSync(fullPath);
+        // Validasi struktur format PNG
+        PNG.sync.read(buf);
+        templateCache.set(divKey, buf);
+        return buf;
+      } catch (err) {
+        console.warn(`Template poster ${name} bukan PNG valid:`, err.message);
+      }
+    }
+  }
+
+  throw new Error(`Template poster QRIS PNG tidak ditemukan untuk divisi ${division}`);
 }
 
 /**
  * Generate complete official QRIS poster Buffer (PNG format)
  * @param {string} dynamicQrisString
- * @param {object} options
+ * @param {object|string} options
  * @returns {Promise<Buffer>}
  */
 async function generateQRISPosterBuffer(dynamicQrisString, options = {}) {
-  const tplBuffer = getTemplateBuffer();
+  const division = typeof options === 'string' ? options : (options && options.division ? options.division : 'mumtaz');
+  const tplBuffer = getTemplateBuffer(division);
   // Decode template PNG (cloned from cached buffer)
   const templatePng = PNG.sync.read(tplBuffer);
 
@@ -70,7 +90,7 @@ async function generateQRISPosterBuffer(dynamicQrisString, options = {}) {
 }
 
 module.exports = {
-  TEMPLATE_PATH,
   QR_BOX,
   generateQRISPosterBuffer,
+  getTemplateBuffer
 };

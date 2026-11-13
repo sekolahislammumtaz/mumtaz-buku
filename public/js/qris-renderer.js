@@ -18,22 +18,55 @@
     },
   };
 
-  // Cache template Image object
-  let cachedTemplateImg = null;
+  // Cache template Image object per division
+  const cachedTemplateImgs = new Map();
 
-  function loadTemplateImage() {
-    return new Promise((resolve, reject) => {
-      if (cachedTemplateImg && cachedTemplateImg.complete && cachedTemplateImg.naturalWidth > 0) {
-        return resolve(cachedTemplateImg);
+  function loadTemplateImage(division) {
+    const divKey = (division || 'mumtaz').toLowerCase();
+    if (cachedTemplateImgs.has(divKey)) {
+      const cached = cachedTemplateImgs.get(divKey);
+      if (cached.complete && cached.naturalWidth > 0) return Promise.resolve(cached);
+    }
+
+    return new Promise((resolve) => {
+      const candidates = [
+        `/images/qris-template-${divKey}.jpg`,
+        `/images/qris-template-${divKey}.png`,
+        QRIS_CONFIG.templateUrl
+      ];
+
+      function tryLoad(index) {
+        if (index >= candidates.length) {
+          // Fallback final ke default template
+          const fallbackImg = new Image();
+          fallbackImg.crossOrigin = 'anonymous';
+          fallbackImg.onload = () => {
+            cachedTemplateImgs.set(divKey, fallbackImg);
+            resolve(fallbackImg);
+          };
+          fallbackImg.onerror = () => resolve(null);
+          fallbackImg.src = QRIS_CONFIG.templateUrl;
+          return;
+        }
+
+        const candidateUrl = candidates[index];
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          if (img.naturalWidth > 0) {
+            cachedTemplateImgs.set(divKey, img);
+            resolve(img);
+          } else {
+            tryLoad(index + 1);
+          }
+        };
+        img.onerror = () => {
+          tryLoad(index + 1);
+        };
+        img.src = candidateUrl;
       }
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        cachedTemplateImg = img;
-        resolve(img);
-      };
-      img.onerror = (err) => reject(new Error('Gagal memuat template poster QRIS: ' + QRIS_CONFIG.templateUrl));
-      img.src = QRIS_CONFIG.templateUrl;
+
+      tryLoad(0);
     });
   }
 
@@ -55,7 +88,7 @@
    * @returns {Promise<{ canvas: HTMLCanvasElement, dataUrl: string, blob: Blob }>}
    */
   async function renderQRISTemplate(targetCanvas, qrSource, options = {}) {
-    const templateImg = await loadTemplateImage();
+    const templateImg = await loadTemplateImage(options.division);
     const qrImg = (typeof qrSource === 'string') ? await loadImage(qrSource) : qrSource;
 
     const canvas = targetCanvas || document.createElement('canvas');

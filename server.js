@@ -5,7 +5,7 @@ const xlsx = require('xlsx');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
-const { initDatabase, dbQuery, hashPassword } = require('./database');
+const { initDatabase, dbQuery, hashPassword, DEFAULT_STATIC_QRIS_BSI } = require('./database');
 const { validateQRIS, parseQRISData, convertToDynamic } = require('./utils/qris');
 const { generateQRISPosterBuffer } = require('./utils/qris_poster');
 
@@ -58,15 +58,20 @@ function verifyOrderToken(order, token) {
   return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedToken));
 }
 
-// Helper membaca QRIS statis divisi dari settings
-async function getDivisionStaticQris(division) {
+// Helper membaca QRIS statis divisi dari settings (dengan opsi fallback)
+async function getDivisionStaticQris(division, fallbackToDefault = false) {
   const divKey = (division || 'mumtaz').toLowerCase();
   const settingKey = `qris_static_${divKey}`;
   const row = await dbQuery.get('SELECT value FROM settings WHERE key = ?', [settingKey]);
   if (row && row.value && row.value.trim()) return row.value.trim();
-  if (divKey !== 'mumtaz') {
-    const fallback = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_mumtaz']);
-    if (fallback && fallback.value && fallback.value.trim()) return fallback.value.trim();
+
+  // Jika diizinkan fallback (misal saat proses checkout order, tagihan publik, invoice & poster)
+  if (fallbackToDefault) {
+    if (divKey !== 'mumtaz') {
+      const fallback = await dbQuery.get('SELECT value FROM settings WHERE key = ?', ['qris_static_mumtaz']);
+      if (fallback && fallback.value && fallback.value.trim()) return fallback.value.trim();
+    }
+    return DEFAULT_STATIC_QRIS_BSI;
   }
   return null;
 }
@@ -365,7 +370,7 @@ app.post('/api/orders', async (req, res) => {
     let dynamicQrisString = null;
     let merchantName = null;
 
-    const staticQris = await getDivisionStaticQris(orderDivision);
+    const staticQris = await getDivisionStaticQris(orderDivision, true);
     if (staticQris && verifiedTotalPrice > 0) {
       const qrisVal = validateQRIS(staticQris);
       if (qrisVal.valid) {
@@ -817,12 +822,14 @@ app.post('/api/admin/students/import', authenticateAdmin, upload.single('file'),
 // GET static QRIS setting for logged-in admin division
 app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
+  const divMeta = getDivisionMeta(division);
   try {
-    const staticQris = await getDivisionStaticQris(division);
+    const staticQris = await getDivisionStaticQris(division, false);
     if (!staticQris) {
       return res.json({
         configured: false,
         division,
+        division_name: divMeta.name,
         qris_string: null,
         merchant_name: null,
         merchant_city: null,
@@ -834,6 +841,7 @@ app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
     res.json({
       configured: true,
       division,
+      division_name: divMeta.name,
       qris_string: staticQris,
       merchant_name: val.valid ? val.data.merchantName : null,
       merchant_city: val.valid ? val.data.merchantCity : null,
@@ -849,6 +857,7 @@ app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
 // POST save static QRIS for logged-in admin division (or apply to all divisions)
 app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
+  const divMeta = getDivisionMeta(division);
   const { qris_string, apply_all } = req.body;
 
   if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
@@ -878,7 +887,7 @@ app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
     } else {
       await saveSetting(`qris_static_${division}`, cleanQris);
       return res.json({
-        message: `QRIS statis berhasil disimpan untuk divisi ${division}.`,
+        message: `QRIS statis berhasil disimpan khusus untuk divisi ${divMeta.name}.`,
         merchant_name: val.data.merchantName,
         merchant_city: val.data.merchantCity,
         applied_to: [division]
@@ -893,9 +902,10 @@ app.post('/api/admin/qris', authenticateAdmin, async (req, res) => {
 // DELETE static QRIS setting for logged-in admin division
 app.delete('/api/admin/qris', authenticateAdmin, async (req, res) => {
   const division = req.admin.division || 'mumtaz';
+  const divMeta = getDivisionMeta(division);
   try {
     await dbQuery.run('DELETE FROM settings WHERE key = ?', [`qris_static_${division}`]);
-    res.json({ message: `QRIS statis untuk divisi ${division} berhasil dihapus.` });
+    res.json({ message: `QRIS statis untuk divisi ${divMeta.name} berhasil dihapus/direset.` });
   } catch (error) {
     console.error('Error deleting QRIS:', error);
     res.status(500).json({ message: 'Gagal menghapus konfigurasi QRIS.' });
@@ -904,10 +914,17 @@ app.delete('/api/admin/qris', authenticateAdmin, async (req, res) => {
 
 // POST preview dynamic QRIS (admin simulation test)
 app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
-  const { qris_string, amount } = req.body;
+  const division = req.admin.division || 'mumtaz';
+  const divMeta = getDivisionMeta(division);
+  let { qris_string, amount } = req.body;
+
+  // Jika string QRIS tidak dikirim, otomatis gunakan konfigurasi QRIS milik divisi yang aktif
+  if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
+    qris_string = await getDivisionStaticQris(division, true);
+  }
 
   if (!qris_string || typeof qris_string !== 'string' || !qris_string.trim()) {
-    return res.status(400).json({ message: 'String QRIS wajib diisi.' });
+    return res.status(400).json({ message: 'String QRIS belum diatur untuk divisi ini.' });
   }
 
   const cleanQris = qris_string.trim();
@@ -929,6 +946,8 @@ app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
     const previewDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 400, margin: 2 });
 
     res.json({
+      division,
+      division_name: divMeta.name,
       dynamic_qris: dynamicResult.dynamicQris,
       merchant_name: dynamicResult.merchantName,
       merchant_city: dynamicResult.merchantCity,
@@ -1335,7 +1354,7 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
 
     const divMeta = getDivisionMeta(order.division);
     const orderCode = `${divMeta.prefix}-${String(order.id).padStart(4, '0')}`;
-    const staticQris = await getDivisionStaticQris(order.division);
+    const staticQris = await getDivisionStaticQris(order.division, true);
 
     let qrisConfigured = false;
     let merchantName = null;
@@ -1404,7 +1423,7 @@ app.get('/api/orders/:id/qris.png', async (req, res) => {
       return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
     }
 
-    const staticQris = await getDivisionStaticQris(order.division);
+    const staticQris = await getDivisionStaticQris(order.division, true);
     if (!staticQris) {
       return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
     }
@@ -1457,7 +1476,7 @@ app.get('/api/orders/:id/poster.png', async (req, res) => {
       return res.status(403).json({ message: 'Akses ditolak: token invoice tidak valid atau kedaluwarsa.' });
     }
 
-    const staticQris = await getDivisionStaticQris(order.division);
+    const staticQris = await getDivisionStaticQris(order.division, true);
     if (!staticQris) {
       return res.status(404).json({ message: 'QRIS untuk divisi ini belum dikonfigurasi.' });
     }
@@ -1468,7 +1487,7 @@ app.get('/api/orders/:id/poster.png', async (req, res) => {
     }
 
     const dynamicResult = convertToDynamic(staticQris, { amount });
-    const posterBuffer = await generateQRISPosterBuffer(dynamicResult.dynamicQris);
+    const posterBuffer = await generateQRISPosterBuffer(dynamicResult.dynamicQris, { division: order.division });
 
     const divMeta = getDivisionMeta(order.division);
     const filename = `Poster-QRIS-${divMeta.prefix}-${String(order.id).padStart(4, '0')}.png`;
