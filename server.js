@@ -683,6 +683,69 @@ app.get('/api/admin/students', authenticateAdmin, async (req, res) => {
   }
 });
 
+// POST add new student manual
+app.post('/api/admin/students', authenticateAdmin, async (req, res) => {
+  const { name, kelas, va_number, whatsapp, email } = req.body;
+  const division = req.admin.division || 'mumtaz';
+
+  if (!name || !kelas || !va_number) {
+    return res.status(400).json({ message: 'Nama siswa, kelas, dan nomor VA wajib diisi.' });
+  }
+
+  const cleanName = name.toString().trim();
+  const cleanKelas = kelas.toString().trim();
+  const cleanVa = va_number.toString().trim();
+  const cleanWhatsapp = whatsapp ? whatsapp.toString().replace(/[^0-9]/g, '') : '';
+  const cleanEmail = email ? email.toString().trim() : '';
+
+  try {
+    const result = await dbQuery.run(
+      'INSERT INTO students (division, name, kelas, va_number, whatsapp, email) VALUES (?, ?, ?, ?, ?, ?)',
+      [division, cleanName, cleanKelas, cleanVa, cleanWhatsapp, cleanEmail]
+    );
+    res.status(201).json({ 
+      message: 'Data siswa berhasil ditambahkan.',
+      id: result.lastID 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal menambahkan data siswa.' });
+  }
+});
+
+// PUT update student
+app.put('/api/admin/students/:id', authenticateAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, kelas, va_number, whatsapp, email } = req.body;
+  const division = req.admin.division || 'mumtaz';
+
+  if (!name || !kelas || !va_number) {
+    return res.status(400).json({ message: 'Nama siswa, kelas, dan nomor VA wajib diisi.' });
+  }
+
+  const cleanName = name.toString().trim();
+  const cleanKelas = kelas.toString().trim();
+  const cleanVa = va_number.toString().trim();
+  const cleanWhatsapp = whatsapp ? whatsapp.toString().replace(/[^0-9]/g, '') : '';
+  const cleanEmail = email ? email.toString().trim() : '';
+
+  try {
+    const result = await dbQuery.run(
+      'UPDATE students SET name = ?, kelas = ?, va_number = ?, whatsapp = ?, email = ? WHERE id = ? AND division = ?',
+      [cleanName, cleanKelas, cleanVa, cleanWhatsapp, cleanEmail, id, division]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Data siswa tidak ditemukan.' });
+    }
+
+    res.json({ message: 'Data siswa berhasil diperbarui.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal memperbarui data siswa.' });
+  }
+});
+
 // DELETE single student
 app.delete('/api/admin/students/:id', authenticateAdmin, async (req, res) => {
   const { id } = req.params;

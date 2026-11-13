@@ -306,37 +306,88 @@
       <!-- TAB 3: STUDENTS (KELOLA DATA SISWA) -->
       <!-- ========================================== -->
       <div id="tab-students" class="tab-content">
-        <!-- Import student data section -->
-        <div class="admin-card">
-          <div class="card-header-flex">
-            <div>
-              <h2 style="color: var(--primary-navy); font-weight: 800; font-size: 1.4rem;">
-                Impor Data Siswa dari Excel
-              </h2>
-              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
-                Unggah file Excel daftar siswa dengan kolom: <b>Nama Siswa</b>, <b>Kelas</b>, <b>No VA</b>, <b>No Whatsapp</b>, <b>Alamat Email</b>.
-              </p>
-            </div>
-            <div>
-              <button onclick="clearAllStudents()" class="btn-danger">
-                <i class="fa-solid fa-trash-can"></i> Kosongkan Semua Data Siswa
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;" class="form-grid-3">
+          
+          <!-- Column A: Tambah Siswa Manual -->
+          <div class="admin-card" style="margin-bottom: 0;">
+            <h3 class="section-title" style="margin-bottom: 16px;">
+              <i class="fa-solid fa-user-plus"></i> Tambah Siswa Manual
+            </h3>
+            
+            <form id="add-student-form" onsubmit="handleAddStudent(event)">
+              <div class="form-group">
+                <label for="student-name">Nama Lengkap Siswa</label>
+                <input type="text" id="student-name" class="form-control" placeholder="Contoh: Muhammad Rizky" required>
+              </div>
+              <div class="form-grid-3" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
+                <div class="form-group">
+                  <label id="label-student-class" for="student-class">Kelas</label>
+                  <select id="student-class" class="form-control" required>
+                    <option value="" disabled selected>Pilih kelas...</option>
+                    <!-- Diisi dinamis -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="student-va">Nomor Virtual Account (VA)</label>
+                  <input type="text" id="student-va" class="form-control" placeholder="Contoh: 880812345678" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="student-whatsapp">No. WhatsApp Orang Tua (Opsional)</label>
+                <input type="tel" id="student-whatsapp" class="form-control" placeholder="Contoh: 081234567890">
+              </div>
+              <div class="form-group">
+                <label for="student-email">Alamat Email Orang Tua (Opsional)</label>
+                <input type="email" id="student-email" class="form-control" placeholder="Contoh: ortu@gmail.com">
+              </div>
+              <button type="submit" class="btn-action-primary" style="width: 100%; margin-top: 8px;">
+                <i class="fa-solid fa-save"></i> Simpan Data Siswa
               </button>
-            </div>
+            </form>
           </div>
 
-          <form id="import-students-form" onsubmit="handleImportStudents(event)" style="border: 2px dashed #E2E8F0; padding: 24px; border-radius: var(--border-radius-md); text-align: center; background-color: #F8FAFC;">
-            <div style="margin-bottom: 16px;">
-              <i class="fa-regular fa-file-excel" style="font-size: 3rem; color: #10B981; margin-bottom: 12px;"></i>
-              <p style="font-weight: 600; color: var(--primary-navy);">Pilih file Excel (.xlsx / .xls)</p>
-              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Pastikan data kolom sudah sesuai format.</p>
+          <!-- Column B: Impor Data Siswa & Kosongkan Data -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- Excel Import Card -->
+            <div class="admin-card" style="margin-bottom: 0; flex: 1;">
+              <h3 class="section-title" style="margin-bottom: 16px;">
+                <i class="fa-solid fa-file-import"></i> Impor Data Siswa dari Excel
+              </h3>
+              <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: -12px; margin-bottom: 16px;">
+                Format kolom: <b>Nama Siswa</b>, <b>Kelas</b>, <b>No VA</b>, <b>No Whatsapp</b>, <b>Alamat Email</b>.
+              </p>
+
+              <form id="import-students-form" onsubmit="handleImportStudents(event)" style="border: 2px dashed #E2E8F0; padding: 20px; border-radius: var(--border-radius-md); text-align: center; background-color: #F8FAFC;">
+                <div style="margin-bottom: 12px;">
+                  <i class="fa-regular fa-file-excel" style="font-size: 2.2rem; color: #10B981; margin-bottom: 8px;"></i>
+                  <p style="font-weight: 600; color: var(--primary-navy); font-size: 0.9rem;">Pilih file Excel (.xlsx / .xls)</p>
+                </div>
+                <input type="file" id="import-students-file" accept=".xlsx, .xls" required style="display: inline-block; margin-bottom: 12px; font-size: 0.85rem; max-width: 100%;">
+                <div>
+                  <button type="submit" class="btn-action-accent" style="width: 100%;">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Mulai Impor Data Siswa
+                  </button>
+                </div>
+              </form>
             </div>
-            <input type="file" id="import-students-file" accept=".xlsx, .xls" required style="display: inline-block; margin-bottom: 16px; font-size: 0.9rem;">
-            <div>
-              <button type="submit" class="btn-action-accent" style="padding: 10px 24px;">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Mulai Impor Data Siswa
-              </button>
+
+            <!-- Clear All Students Card -->
+            <div class="admin-card" style="margin-bottom: 0;">
+              <h3 class="section-title" style="margin-bottom: 16px; color: #EF4444; border-bottom-color: #FEE2E2;">
+                <i class="fa-solid fa-trash-can"></i> Kosongkan Data Siswa
+              </h3>
+              <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between;">
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">
+                  Hapus seluruh data siswa di unit ini.
+                </p>
+                <button onclick="clearAllStudents()" class="btn-danger" style="white-space: nowrap;">
+                  <i class="fa-solid fa-trash-can"></i> Kosongkan Semua
+                </button>
+              </div>
             </div>
-          </form>
+
+          </div>
         </div>
 
         <!-- Student List Table Section -->
@@ -550,6 +601,59 @@
         
         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
           <button type="button" onclick="closeEditBookModal()" class="btn-logout" style="color: var(--text-dark); border-color: #CBD5E1; padding: 10px 20px;">
+            Batal
+          </button>
+          <button type="submit" class="btn-action-primary" style="padding: 10px 24px;">
+            Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: EDIT STUDENT -->
+  <!-- ========================================== -->
+  <div id="edit-student-modal" class="modal-overlay">
+    <div class="modal-content" style="text-align: left; max-width: 500px; border-top-color: var(--primary-navy);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #F1F5F9; padding-bottom: 12px;">
+        <h3 style="color: var(--primary-navy); font-weight: 800; font-size: 1.3rem;">
+          <i class="fa-solid fa-user-pen"></i> Ubah Data Siswa
+        </h3>
+        <button onclick="closeEditStudentModal()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="edit-student-form" onsubmit="handleUpdateStudent(event)">
+        <input type="hidden" id="edit-student-id">
+        <div class="form-group">
+          <label for="edit-student-name">Nama Lengkap Siswa</label>
+          <input type="text" id="edit-student-name" class="form-control" required>
+        </div>
+        <div class="form-grid-3" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
+          <div class="form-group">
+            <label for="edit-student-class">Kelas</label>
+            <select id="edit-student-class" class="form-control" required>
+              <!-- Diisi dinamis -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="edit-student-va">Nomor Virtual Account (VA)</label>
+            <input type="text" id="edit-student-va" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-student-whatsapp">No. WhatsApp Orang Tua</label>
+          <input type="tel" id="edit-student-whatsapp" class="form-control" placeholder="Contoh: 081234567890">
+        </div>
+        <div class="form-group">
+          <label for="edit-student-email">Alamat Email Orang Tua</label>
+          <input type="email" id="edit-student-email" class="form-control" placeholder="Contoh: ortu@gmail.com">
+        </div>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+          <button type="button" onclick="closeEditStudentModal()" class="btn-logout" style="color: var(--text-dark); border-color: #CBD5E1; padding: 10px 20px;">
             Batal
           </button>
           <button type="submit" class="btn-action-primary" style="padding: 10px 24px;">

@@ -41,6 +41,7 @@ const toastContainer = document.getElementById('toast-container');
 
 // Modals & Inputs
 const editBookModal = document.getElementById('edit-book-modal');
+const editStudentModal = document.getElementById('edit-student-modal');
 const editOrderModal = document.getElementById('edit-order-modal');
 const changePasswordModal = document.getElementById('change-password-modal');
 
@@ -145,6 +146,10 @@ function updateDivisionUI(division) {
   if (labelBookClass) {
     labelBookClass.innerText = `Kelas (${meta.classes[0]} - ${meta.classes[meta.classes.length - 1]})`;
   }
+  const labelStudentClass = document.getElementById('label-student-class');
+  if (labelStudentClass) {
+    labelStudentClass.innerText = `Kelas (${meta.classes[0]} - ${meta.classes[meta.classes.length - 1]})`;
+  }
 
   // 3. Update Modal Ubah Password Title
   const changePassTitle = document.getElementById('change-password-title');
@@ -192,8 +197,10 @@ function updateDivisionUI(division) {
   fillDropdown('clear-class', false, 'Pilih kelas...');
   fillDropdown('filter-class', true);
   fillDropdown('filter-student-class', true);
+  fillDropdown('student-class', false, 'Pilih kelas...');
   fillDropdown('edit-book-class', false, 'Pilih kelas...');
   fillDropdown('edit-order-class', false, 'Pilih kelas...');
+  fillDropdown('edit-student-class', false, 'Pilih kelas...');
 }
 
 // API Fetch wrapper dengan Bearer Token
@@ -933,7 +940,10 @@ function renderStudentsTable(data = allStudents) {
       <td>${student.email || '<span style="color: var(--text-muted); font-style: italic;">Tidak ada</span>'}</td>
       <td>
         <div class="actions-flex">
-          <button onclick="deleteStudent(${student.id})" class="btn-sm-delete">
+          <button onclick="openEditStudentModal(${student.id})" class="btn-sm-edit" title="Edit Data Siswa">
+            <i class="fa-solid fa-pen"></i> Edit
+          </button>
+          <button onclick="deleteStudent(${student.id})" class="btn-sm-delete" title="Hapus Siswa">
             <i class="fa-solid fa-trash-can"></i> Hapus
           </button>
         </div>
@@ -941,6 +951,119 @@ function renderStudentsTable(data = allStudents) {
     `;
     tableBody.appendChild(row);
   });
+}
+
+// Add Student Manual
+async function handleAddStudent(event) {
+  event.preventDefault();
+
+  const studentData = {
+    name: document.getElementById('student-name').value.trim(),
+    kelas: document.getElementById('student-class').value,
+    va_number: document.getElementById('student-va').value.trim(),
+    whatsapp: document.getElementById('student-whatsapp').value.trim(),
+    email: document.getElementById('student-email').value.trim()
+  };
+
+  if (!studentData.name || !studentData.kelas || !studentData.va_number) {
+    showToast('Nama siswa, kelas, dan nomor VA wajib diisi.', 'error');
+    return;
+  }
+
+  try {
+    const response = await apiFetch('/api/admin/students', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(studentData)
+    });
+
+    const resData = await response.json();
+    if (response.ok) {
+      showToast(resData.message, 'success');
+      document.getElementById('add-student-form').reset();
+      loadStudents();
+    } else {
+      showToast(resData.message || 'Gagal menambahkan data siswa.', 'error');
+    }
+  } catch (error) {
+    showToast('Terjadi kesalahan koneksi server.', 'error');
+  }
+}
+
+// Edit Student Modal Handlers
+function openEditStudentModal(studentId) {
+  const student = allStudents.find(s => s.id === studentId);
+  if (!student) return;
+
+  document.getElementById('edit-student-id').value = student.id;
+  document.getElementById('edit-student-name').value = student.name || '';
+  
+  const classSelect = document.getElementById('edit-student-class');
+  if (classSelect) {
+    const exists = Array.from(classSelect.options).some(opt => opt.value === String(student.kelas));
+    if (!exists && student.kelas) {
+      const opt = document.createElement('option');
+      opt.value = student.kelas;
+      opt.textContent = `Kelas ${student.kelas}`;
+      classSelect.appendChild(opt);
+    }
+    classSelect.value = student.kelas;
+  }
+
+  document.getElementById('edit-student-va').value = student.va_number || '';
+  document.getElementById('edit-student-whatsapp').value = student.whatsapp || '';
+  document.getElementById('edit-student-email').value = student.email || '';
+
+  if (editStudentModal) {
+    editStudentModal.classList.add('show');
+  }
+}
+
+function closeEditStudentModal() {
+  if (editStudentModal) {
+    editStudentModal.classList.remove('show');
+  }
+}
+
+async function handleUpdateStudent(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('edit-student-id').value;
+  const studentData = {
+    name: document.getElementById('edit-student-name').value.trim(),
+    kelas: document.getElementById('edit-student-class').value,
+    va_number: document.getElementById('edit-student-va').value.trim(),
+    whatsapp: document.getElementById('edit-student-whatsapp').value.trim(),
+    email: document.getElementById('edit-student-email').value.trim()
+  };
+
+  if (!studentData.name || !studentData.kelas || !studentData.va_number) {
+    showToast('Nama siswa, kelas, dan nomor VA wajib diisi.', 'error');
+    return;
+  }
+
+  try {
+    const response = await apiFetch(`/api/admin/students/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(studentData)
+    });
+
+    const resData = await response.json();
+    if (response.ok) {
+      showToast(resData.message, 'success');
+      closeEditStudentModal();
+      loadStudents();
+    } else {
+      showToast(resData.message || 'Gagal memperbarui data siswa.', 'error');
+    }
+  } catch (error) {
+    showToast('Terjadi kesalahan koneksi server.', 'error');
+  }
 }
 
 function filterStudentsTable() {
