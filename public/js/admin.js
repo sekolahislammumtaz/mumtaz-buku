@@ -1188,6 +1188,7 @@ async function loadQrisSettings() {
           <div>
             <strong style="color: var(--primary-navy); font-size: 0.95rem;">${data.merchant_name || 'MERCHANT BANK BSI'}</strong>
             <span style="color: var(--text-muted); margin-left: 6px;">(${data.merchant_city || 'INDONESIA'})</span>
+            ${data.nmid ? `<div style="font-size: 0.8rem; color: #64748B; font-weight: 600; margin-top: 2px;">NMID: ${data.nmid}</div>` : ''}
           </div>
         `;
       }
@@ -1526,13 +1527,20 @@ async function handlePreviewQris() {
         `;
 
         if (window.QRIS_RENDERER && data.preview_url) {
-          window.QRIS_RENDERER.renderQRISTemplate(null, data.preview_url).then(rendered => {
+          window.QRIS_RENDERER.renderQRISTemplate(null, data.preview_url, {
+            division: activeDivision,
+            merchant_name: data.merchant_name,
+            nmid: data.nmid,
+            criteria: data.terminal_criteria,
+            dynamic_qris: data.dynamic_qris
+          }).then(rendered => {
             const pImg = document.getElementById('admin-preview-poster-img');
             if (pImg) pImg.src = rendered.dataUrl;
             const dlPBtn = document.getElementById('admin-preview-dl-poster-btn');
             if (dlPBtn) {
               dlPBtn.onclick = () => {
-                window.QRIS_RENDERER.downloadQRISImage(rendered.dataUrl, `Simulasi-Poster-QRIS-${data.amount}.jpg`);
+                const safeName = (data.merchant_name || activeDivision).replace(/[^a-zA-Z0-9]/g, '-');
+                window.QRIS_RENDERER.downloadQRISImage(rendered.dataUrl, `Simulasi-Poster-QRIS-${safeName}-${data.amount}.jpg`);
               };
             }
           }).catch(e => {

@@ -631,7 +631,13 @@ async function handleFormSubmit(event) {
 
       // Rendring instan menggunakan canvas client-side jika renderer siap
       if (window.QRIS_RENDERER && resData.qris_data_url) {
-        window.QRIS_RENDERER.renderQRISTemplate(null, resData.qris_data_url, { division: currentDivision }).then(rendered => {
+        window.QRIS_RENDERER.renderQRISTemplate(null, resData.qris_data_url, {
+          division: currentDivision,
+          merchant_name: resData.merchant_name,
+          nmid: resData.nmid,
+          criteria: resData.terminal_criteria,
+          dynamic_qris: resData.dynamic_qris
+        }).then(rendered => {
           if (qrisImg) qrisImg.src = rendered.dataUrl;
           if (qrisPosterDownloadBtn) {
             qrisPosterDownloadBtn.onclick = (e) => {

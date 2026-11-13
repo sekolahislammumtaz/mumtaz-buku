@@ -347,11 +347,68 @@ function convertToDynamic(qrisString, options = {}) {
   const newCRC = calculateCRC16(crcPayload);
   const dynamicQris = crcPayload + newCRC;
 
+  // Ekstrak detail spesifik merchant (NMID & Criteria)
+  const details = extractQRISDetails(qrisString);
+
   return {
     dynamicQris,
-    merchantName: validation.data.merchantName,
-    merchantCity: validation.data.merchantCity,
+    merchantName: details.merchantName || validation.data.merchantName,
+    merchantCity: details.merchantCity || validation.data.merchantCity,
+    nmid: details.nmid,
+    terminalCriteria: details.terminalCriteria,
     amount: intAmount,
+  };
+}
+
+/**
+ * Ekstrak detail merchant (Nama, Kota, NMID, dan Kriteria Terminal) dari string QRIS
+ * @param {string} qrisString
+ * @returns {{ merchantName: string, merchantCity: string, nmid: string, terminalCriteria: string }}
+ */
+function extractQRISDetails(qrisString) {
+  if (!qrisString || typeof qrisString !== "string") {
+    return { merchantName: "", merchantCity: "", nmid: "", terminalCriteria: "A01" };
+  }
+
+  const parsed = parseQRISData(qrisString);
+  let nmid = "";
+
+  // 1. Cari di Tag 51 (National Merchant ID / Domestik Indonesia)
+  const tag51 = parsed.merchantAccountInfo.find((m) => m.tag === "51");
+  if (tag51) {
+    const sub02 = tag51.fields?.find((c) => c.tag === "02")?.value;
+    if (sub02 && sub02.trim()) nmid = sub02.trim();
+  }
+
+  // 2. Jika tidak ada di Tag 51, cari di Tag 26-50 sub-tag 02 yang berawalan ID
+  if (!nmid) {
+    for (const m of parsed.merchantAccountInfo) {
+      const sub02 = m.fields?.find((c) => c.tag === "02")?.value;
+      if (sub02 && sub02.trim().startsWith("ID")) {
+        nmid = sub02.trim();
+        break;
+      }
+    }
+  }
+
+  // 3. Fallback regex untuk format NMID (e.g. ID2025... / 0215ID...)
+  if (!nmid) {
+    const match = qrisString.match(/021[0-9](ID[0-9A-Za-z]+)/);
+    if (match) nmid = match[1];
+  }
+
+  // Terminal criteria (e.g. Tag 62 sub-tag 07: A01)
+  let terminalCriteria = "A01";
+  if (parsed.additionalData) {
+    const sub07 = parsed.additionalData.find((c) => c.tag === "07")?.value;
+    if (sub07 && sub07.trim()) terminalCriteria = sub07.trim();
+  }
+
+  return {
+    merchantName: parsed.merchantName ? parsed.merchantName.trim() : "",
+    merchantCity: parsed.merchantCity ? parsed.merchantCity.trim() : "",
+    nmid: nmid || "",
+    terminalCriteria: terminalCriteria || "A01",
   };
 }
 
@@ -362,4 +419,5 @@ module.exports = {
   parseQRISData,
   validateQRIS,
   convertToDynamic,
+  extractQRISDetails,
 };

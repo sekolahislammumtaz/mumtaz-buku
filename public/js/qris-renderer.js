@@ -81,6 +81,37 @@
   }
 
   /**
+   * Parse ringan string QRIS untuk mengekstrak Nama Merchant & NMID
+   */
+  function parseQRISPayload(str) {
+    if (!str || typeof str !== 'string') return {};
+    let merchantName = '';
+    let nmid = '';
+    let criteria = 'A01';
+
+    // Tag 59: Merchant Name
+    const mMatch = str.match(/59([0-9]{2})(.+)/);
+    if (mMatch) {
+      const len = parseInt(mMatch[1], 10);
+      merchantName = mMatch[2].substring(0, len);
+    }
+
+    // NMID in Tag 51 (atau subtag 02 berawalan ID)
+    const nmidMatch = str.match(/021[0-9](ID[0-9A-Za-z]+)/) || str.match(/(ID[0-9]{10,18})/);
+    if (nmidMatch) {
+      nmid = nmidMatch[1];
+    }
+
+    // Additional data criteria (misal: 0703A01)
+    const critMatch = str.match(/0703([A-Z0-9]{3})/);
+    if (critMatch) {
+      criteria = critMatch[1];
+    }
+
+    return { merchantName, nmid, criteria };
+  }
+
+  /**
    * Render poster template with dynamic QRIS code
    * @param {HTMLCanvasElement|null} targetCanvas Canvas element to draw into (or null for offscreen)
    * @param {string|HTMLImageElement} qrSource DataURL or image element of the QR code
@@ -101,12 +132,55 @@
     // 1. Gambar poster template dasar
     ctx.drawImage(templateImg, 0, 0, QRIS_CONFIG.width, QRIS_CONFIG.height);
 
-    // 2. Bersihkan kotak QR code dengan warna putih murni
+    // 2. Tentukan data merchant & NMID (dari options atau payload QRIS)
+    let mName = (options.merchantName || options.merchant_name || '').trim();
+    let nmidVal = (options.nmid || '').trim();
+    let critVal = (options.terminalCriteria || options.criteria || '').trim();
+
+    if ((!mName || !nmidVal) && (options.qrisString || options.dynamic_qris)) {
+      const parsed = parseQRISPayload(options.qrisString || options.dynamic_qris);
+      if (!mName && parsed.merchantName) mName = parsed.merchantName;
+      if (!nmidVal && parsed.nmid) nmidVal = parsed.nmid;
+      if (!critVal && parsed.criteria) critVal = parsed.criteria;
+    }
+
+    // Default fallback jika tidak terdeteksi
+    if (!mName) mName = 'SEKOLAH ISLAM MUMTAZ';
+    if (!nmidVal) nmidVal = 'ID2025450627653';
+    if (!critVal) critVal = 'A01';
+
+    // 3. Bersihkan area teks header lama (nama sekolah, NMID, A01) dengan warna putih murni
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(90, 130, 546, 185);
+
+    // 4. Render Nama Merchant QRIS yang sesuai dengan data upload
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#111827';
+    let fontSize = 28;
+    const upperName = mName.toUpperCase();
+    if (upperName.length > 22) fontSize = 24;
+    if (upperName.length > 30) fontSize = 20;
+    if (upperName.length > 38) fontSize = 17;
+    ctx.font = `bold ${fontSize}px "Segoe UI", Arial, Helvetica, sans-serif`;
+    ctx.fillText(upperName, 363, 175);
+
+    // 5. Render NMID QRIS yang sesuai dengan data upload
+    ctx.fillStyle = '#374151';
+    ctx.font = '600 21px "Segoe UI", Arial, Helvetica, sans-serif';
+    ctx.fillText(`NMID : ${nmidVal}`, 363, 222);
+
+    // 6. Render Kriteria / Terminal ID
+    ctx.fillStyle = '#4B5563';
+    ctx.font = '500 19px "Segoe UI", Arial, Helvetica, sans-serif';
+    ctx.fillText(critVal, 363, 268);
+
+    // 7. Bersihkan kotak QR code dengan warna putih murni
     const box = QRIS_CONFIG.qrBox;
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(box.x - 1, box.y - 1, box.width + 2, box.height + 2);
 
-    // 3. Tempelkan QR code dinamis tepat di kotak QR template
+    // 8. Tempelkan QR code dinamis tepat di kotak QR template
     ctx.drawImage(qrImg, box.x, box.y, box.width, box.height);
 
     // Dapatkan data URL kualitas tinggi (JPEG 95% atau PNG)

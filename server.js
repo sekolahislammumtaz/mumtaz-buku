@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { initDatabase, dbQuery, hashPassword, DEFAULT_STATIC_QRIS_BSI } = require('./database');
-const { validateQRIS, parseQRISData, convertToDynamic } = require('./utils/qris');
+const { validateQRIS, parseQRISData, convertToDynamic, extractQRISDetails } = require('./utils/qris');
 const { generateQRISPosterBuffer } = require('./utils/qris_poster');
 
 const app = express();
@@ -369,6 +369,8 @@ app.post('/api/orders', async (req, res) => {
     let qrisDataUrl = null;
     let dynamicQrisString = null;
     let merchantName = null;
+    let nmid = null;
+    let terminalCriteria = null;
 
     const staticQris = await getDivisionStaticQris(orderDivision, true);
     if (staticQris && verifiedTotalPrice > 0) {
@@ -378,6 +380,8 @@ app.post('/api/orders', async (req, res) => {
           const dynamicResult = convertToDynamic(staticQris, { amount: verifiedTotalPrice });
           merchantName = dynamicResult.merchantName;
           dynamicQrisString = dynamicResult.dynamicQris;
+          nmid = dynamicResult.nmid;
+          terminalCriteria = dynamicResult.terminalCriteria;
           qrisDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 420, margin: 2 });
           qrisConfigured = true;
         } catch (err) {
@@ -396,6 +400,8 @@ app.post('/api/orders', async (req, res) => {
       qris_data_url: qrisDataUrl,
       dynamic_qris: dynamicQrisString,
       merchant_name: merchantName,
+      nmid: nmid,
+      terminal_criteria: terminalCriteria,
       invoice_url: `/tagihan.html?id=${orderId}&t=${invoiceToken}`,
       qris_image_url: qrisConfigured ? `/api/orders/${orderId}/qris.png?t=${invoiceToken}` : null,
       poster_image_url: qrisConfigured ? `/api/orders/${orderId}/poster.png?t=${invoiceToken}` : null
@@ -901,13 +907,16 @@ app.get('/api/admin/qris', authenticateAdmin, async (req, res) => {
     }
 
     const val = validateQRIS(staticQris);
+    const details = extractQRISDetails(staticQris);
     res.json({
       configured: true,
       division,
       division_name: divMeta.name,
       qris_string: staticQris,
-      merchant_name: val.valid ? val.data.merchantName : null,
-      merchant_city: val.valid ? val.data.merchantCity : null,
+      merchant_name: details.merchantName || (val.valid ? val.data.merchantName : null),
+      merchant_city: details.merchantCity || (val.valid ? val.data.merchantCity : null),
+      nmid: details.nmid,
+      terminal_criteria: details.terminalCriteria,
       valid: val.valid,
       errors: val.errors
     });
@@ -1014,6 +1023,8 @@ app.post('/api/admin/qris/preview', authenticateAdmin, async (req, res) => {
       dynamic_qris: dynamicResult.dynamicQris,
       merchant_name: dynamicResult.merchantName,
       merchant_city: dynamicResult.merchantCity,
+      nmid: dynamicResult.nmid,
+      terminal_criteria: dynamicResult.terminalCriteria,
       amount: dynamicResult.amount,
       preview_url: previewDataUrl
     });
@@ -1421,6 +1432,8 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
 
     let qrisConfigured = false;
     let merchantName = null;
+    let nmid = null;
+    let terminalCriteria = null;
     let qrisDataUrl = null;
     let dynamicQrisString = null;
 
@@ -1432,6 +1445,8 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
           qrisConfigured = true;
           merchantName = dynamicResult.merchantName;
           dynamicQrisString = dynamicResult.dynamicQris;
+          nmid = dynamicResult.nmid;
+          terminalCriteria = dynamicResult.terminalCriteria;
           qrisDataUrl = await QRCode.toDataURL(dynamicResult.dynamicQris, { width: 420, margin: 2 });
         } catch (err) {
           console.error('Error generating dynamic QRIS for invoice:', err);
@@ -1456,6 +1471,8 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
       books: books,
       qris_configured: qrisConfigured,
       merchant_name: merchantName,
+      nmid: nmid,
+      terminal_criteria: terminalCriteria,
       qris_data_url: qrisDataUrl,
       dynamic_qris: dynamicQrisString,
       qris_image_url: qrisConfigured ? `/api/orders/${order.id}/qris.png?t=${token}` : null,
